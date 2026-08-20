@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0.dev (on main)
+## 0.3.0 — 2026-08-21
 
 Dual-era protocol support: the conformance lane now speaks both the 2026-07-28 modern era and
 the legacy initialize handshake.
