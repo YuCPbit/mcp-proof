@@ -26,7 +26,7 @@
   <!-- four lanes -->
   <g>
     <rect x="345" y="110" width="360" height="410" rx="12" fill="#fcfcfb" stroke="#0b0b0b" stroke-opacity="0.1"/>
-    <text x="525" y="146" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">four deterministic lanes</text>
+    <text x="525" y="146" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">three deterministic lanes</text>
 
     <rect x="369" y="170" width="312" height="72" rx="9" fill="#f9f9f7" stroke="#0ca30c" stroke-width="1.4"/>
     <text x="387" y="199" font-size="13.5" font-weight="650" fill="#0b0b0b">① Conformance</text>
@@ -41,8 +41,8 @@
     <text x="387" y="389" font-size="12" fill="#52514e">record / replay · SHA-256 fixtures · drift grading</text>
 
     <rect x="369" y="422" width="312" height="72" rx="9" fill="#f9f9f7" stroke="#c3c2b7" stroke-dasharray="5 4"/>
-    <text x="387" y="451" font-size="13.5" font-weight="650" fill="#898781">④ Semantic (LLM)</text>
-    <text x="387" y="473" font-size="12" fill="#898781">opt-in only — default lanes burn zero tokens</text>
+    <text x="387" y="451" font-size="13.5" font-weight="650" fill="#898781">+ Semantic (LLM) — planned extension</text>
+    <text x="387" y="473" font-size="12" fill="#898781">outside the deterministic core · zero tokens by default</text>
   </g>
 
   <!-- arrow 2 -->

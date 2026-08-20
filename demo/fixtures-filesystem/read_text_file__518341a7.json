@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tool": "read_text_file",
   "case": "empty-string",
   "args": {
@@ -12,15 +12,18 @@
         "type": "text",
         "text": "EISDIR: illegal operation on a directory, read"
       }
-    ]
+    ],
+    "structured": null
   },
-  "response_sha256": "a2895bec8c819993402029ef1cfc001ea84b46f38565f7426c68820986ce972d",
-  "latency_ms": 0,
-  "recorded_at": "2026-08-20T11:56:17.668010+00:00",
-  "server_cmd": [
-    "npx",
-    "-y",
-    "@modelcontextprotocol/server-filesystem",
-    "/tmp/mcp-proof-sandbox"
-  ]
+  "contract_sha256": "89587b2c12d8bbec476f12821fb04376b8ad253e7c599de604877764f30ad541",
+  "observation": {
+    "latency_ms": 1,
+    "recorded_at": "2026-08-20T19:32:04.307419+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
 }

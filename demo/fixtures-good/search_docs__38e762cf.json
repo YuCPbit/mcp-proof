@@ -1,6 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tool": "search_docs",
+  "case": "golden",
   "args": {
     "query": "example"
   },
@@ -11,13 +12,18 @@
         "type": "text",
         "text": "Refund window is 30 days from purchase; see policy section 4.2."
       }
-    ]
+    ],
+    "structured": {
+      "result": "Refund window is 30 days from purchase; see policy section 4.2."
+    }
   },
-  "response_sha256": "06b57fe8c85a7f3631aded808d4082f5475521ea26b42f9689b5f57f870bc5aa",
-  "latency_ms": 2,
-  "recorded_at": "2026-08-18T04:24:45.182304+00:00",
-  "server_cmd": [
-    ".venv/bin/python",
-    "demo/good_server.py"
-  ]
+  "contract_sha256": "da1601ae74b47e0b4445f27530eba703f1046319f2ddf7b2c638cc9f7c55631f",
+  "observation": {
+    "latency_ms": 2,
+    "recorded_at": "2026-08-20T19:31:38.924052+00:00",
+    "server_cmd": [
+      ".venv/bin/python",
+      "demo/good_server.py"
+    ]
+  }
 }

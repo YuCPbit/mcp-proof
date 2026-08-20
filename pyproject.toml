@@ -1,21 +1,42 @@
 [project]
 name = "mcp-proof"
-version = "0.2.0"
+version = "0.2.1"
 description = "Ship an MCP server with a receipt: deterministic conformance, security and regression audit that outputs a client-ready delivery report."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+keywords = ["mcp", "model-context-protocol", "conformance", "regression-testing", "contract-testing", "audit"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+# mcp is pinned below 2.x: the 2.0 SDK (2026-07-28 spec era) renames the
+# client-facing model fields this package reads (e.g. Tool.inputSchema →
+# input_schema). The pin moves with the v0.3 dual-era work, not before.
 dependencies = [
-    "mcp>=1.29",
+    "mcp>=1.29,<2",
+    "httpx>=0.27",
     "jinja2>=3.1",
     "jsonschema>=4.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/YuCPbit/mcp-proof"
+Issues = "https://github.com/YuCPbit/mcp-proof/issues"
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "pytest-asyncio",
     "fastmcp>=3.0",
+    "ruff>=0.6",
 ]
 
 [project.scripts]
@@ -34,3 +55,10 @@ mcpproof = ["report/template.html"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]

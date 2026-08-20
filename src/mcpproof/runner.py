@@ -149,8 +149,10 @@ async def _cmd_run(args) -> int:
         regression is None or regression["summary"]["gate_pass"]
     )
     print(f"✓ report written: {out}")
-    print(f"  conformance MUST failures: {len(must_fails)} | security findings: {len(sec_fails)}"
-          + (f" | drift gate: {'PASS' if regression['summary']['gate_pass'] else 'FAIL'}" if regression else ""))
+    line = f"  conformance MUST failures: {len(must_fails)} | security findings: {len(sec_fails)}"
+    if regression:
+        line += f" | drift gate: {'PASS' if regression['summary']['gate_pass'] else 'FAIL'}"
+    print(line)
     return 0 if gate_ok else 1
 
 
@@ -178,7 +180,11 @@ async def _cmd_replay(args) -> int:
     for d in drifts:
         if d.kind != "OK":
             print(f"[{d.kind}] {d.tool} ({d.fixture}): {d.detail}")
-    print(f"replay: {summary['ok']} clean / {len(drifts)} · gate {'PASS' if summary['gate_pass'] else 'FAIL'}")
+    gate = "PASS" if summary["gate_pass"] else "FAIL"
+    line = f"replay: {summary['ok']} clean / {summary['content_total']} · gate {gate}"
+    if summary["latency"]:
+        line += f" · {summary['latency']} latency advisor{'y' if summary['latency'] == 1 else 'ies'}"
+    print(line)
     return 0 if summary["gate_pass"] else 1
 
 

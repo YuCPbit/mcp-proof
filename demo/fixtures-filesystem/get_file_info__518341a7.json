@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tool": "get_file_info",
   "case": "empty-string",
   "args": {
@@ -12,15 +12,20 @@
         "type": "text",
         "text": "size: 64\ncreated: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nmodified: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\naccessed: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nisDirectory: true\nisFile: false\npermissions: 755"
       }
-    ]
+    ],
+    "structured": {
+      "content": "size: 64\ncreated: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nmodified: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\naccessed: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nisDirectory: true\nisFile: false\npermissions: 755"
+    }
   },
-  "response_sha256": "c2282ef34d0e8d09ff346a6c7d76a9a0881c041b769bf26ef74bd3b6afc5ac54",
-  "latency_ms": 3,
-  "recorded_at": "2026-08-20T11:56:17.691563+00:00",
-  "server_cmd": [
-    "npx",
-    "-y",
-    "@modelcontextprotocol/server-filesystem",
-    "/tmp/mcp-proof-sandbox"
-  ]
+  "contract_sha256": "8ce7ed819f2a3ce2c9b84f6a691fa37e936f5c10243bb2adcebc17a442a8e5b2",
+  "observation": {
+    "latency_ms": 1,
+    "recorded_at": "2026-08-20T19:32:04.338956+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
 }

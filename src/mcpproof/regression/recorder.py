@@ -1,21 +1,26 @@
 """Record golden fixtures: one provenance-stamped JSON per live tool call.
 
-Every fixture carries the SHA-256 of its normalized response, and the
-manifest fingerprints the whole suite, so any later mutation of the
-"contract" is detectable before replay even starts.
+Every fixture is two layers. The contract (tool + args + normalized
+response) is what the server promised; its SHA-256 — and the manifest
+fingerprint aggregated from all contract hashes — depends on behaviour
+only, so identical behaviour re-records to the identical fingerprint.
+The observation (timestamp, latency, server command) is context: kept
+for the report, deliberately outside every hash.
 """
 
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ..client import open_session
 from ..provenance import obj_hash
 from .sampler import sample_args
 
-SCHEMA_VERSION = 2  # v2 adds response.structured (structuredContent); v1 fixtures replay fine
+# v3 splits contract (hashed) from observation (latency/timestamp, unhashed);
+# v2 added response.structured. Older fixtures replay fine.
+SCHEMA_VERSION = 3
 MANIFEST_NAME = "_manifest.json"
 
 # Auto-recording calls every tool once. Tools whose name or description smells
@@ -90,7 +95,7 @@ def fixture_name(tool: str, args: dict) -> str:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _session_ctx(cmd: list[str] | None, url: str | None):
@@ -113,7 +118,7 @@ async def record(
     fixtures_dir = Path(fixtures_dir)
     fixtures_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
-    fixture_hashes: list[str] = []
+    contract_hashes: list[str] = []
     skipped: list[str] = skipped_out if skipped_out is not None else []
     async with _session_ctx(cmd, url) as session:
         entries: list[tuple[str, dict, str]]
@@ -135,29 +140,34 @@ async def record(
             result = await session.call_tool(tool, args)
             latency_ms = int((time.perf_counter() - start) * 1000)
             response = normalize_response(result)
+            contract = {"tool": tool, "args": args, "response": response}
+            contract_sha256 = obj_hash(contract)
             fixture = {
                 "schema_version": SCHEMA_VERSION,
                 "tool": tool,
                 "case": case,
                 "args": args,
                 "response": response,
-                "response_sha256": obj_hash(response),
-                "latency_ms": latency_ms,
-                "recorded_at": _utc_now(),
-                "server_cmd": list(cmd) if cmd else ["--url", url],
+                "contract_sha256": contract_sha256,
+                # context, never hashed: hashes must depend on behaviour only
+                "observation": {
+                    "latency_ms": latency_ms,
+                    "recorded_at": _utc_now(),
+                    "server_cmd": list(cmd) if cmd else ["--url", url],
+                },
             }
             path = fixtures_dir / fixture_name(tool, args)
             path.write_text(
                 json.dumps(fixture, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
             )
             written.append(path)
-            fixture_hashes.append(obj_hash(fixture))
+            contract_hashes.append(contract_sha256)
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "created_at": _utc_now(),
         # recording order, not sorted: stateful tools (save → get) must replay in sequence
         "fixtures": [p.name for p in written],
-        "fixtures_sha256": obj_hash(sorted(fixture_hashes)),
+        "fixtures_sha256": obj_hash(sorted(contract_hashes)),
         "skipped_destructive": skipped,
     }
     (fixtures_dir / MANIFEST_NAME).write_text(

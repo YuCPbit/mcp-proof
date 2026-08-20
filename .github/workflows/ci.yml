@@ -7,12 +7,43 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - { os: ubuntu-latest, python: "3.11" }
+          - { os: ubuntu-latest, python: "3.12" }
+          - { os: ubuntu-latest, python: "3.13" }
+          - { os: macos-latest, python: "3.12" }
+          - { os: windows-latest, python: "3.12" }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python }}"
       - run: pip install -e ".[dev]"
-      - run: python -m pytest -q
+      - run: ruff check src tests demo templates
+      # -ra prints every skip reason: a green run must mean the suite ran,
+      # and test_http fails (not skips) in CI when its server can't boot
+      - run: python -m pytest -q -ra
+
+  package:
+    # Fresh-install gate: build the wheel, install it with runtime deps only,
+    # then audit the zero-dependency demo server end to end. Catches broken
+    # packaging and any dependency resolution that breaks a new user's first run.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - run: pip install dist/*.whl
+      - name: Smoke-audit the planted-violations demo (expects exit 1)
+        run: |
+          set +e
+          mcp-proof run python demo/bad_server.py --out /tmp/report.html
+          ec=$?
+          set -e
+          test "$ec" -eq 1
+          grep -q "NOT SHIP-READY" /tmp/report.html
+          echo "fresh-install smoke OK"

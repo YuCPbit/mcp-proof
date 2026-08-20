@@ -24,7 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--out", default="mcp-proof-report.html", help="Report output path")
     run_p.add_argument("--fixtures", default=None, help="Fixtures dir; enables regression lane")
     run_p.add_argument("--server-name", default=None, help="Display name for the report")
-    run_p.add_argument("--semantic", action="store_true", help="(reserved for v0.2) LLM semantic lane")
+    run_p.add_argument(
+        "--semantic", action="store_true",
+        help="(reserved for a future release) opt-in LLM semantic lane",
+    )
     run_p.add_argument(
         "--include-destructive", action="store_true",
         help="Also record write/delete/exec-style tools when creating a baseline (default: skip them)",

@@ -1,6 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tool": "get_note",
+  "case": "golden",
   "args": {
     "title": "example"
   },
@@ -11,13 +12,18 @@
         "type": "text",
         "text": "example"
       }
-    ]
+    ],
+    "structured": {
+      "result": "example"
+    }
   },
-  "response_sha256": "4204a3de8a41206037f522f68a3e97f13ffafb95cd15a6f98d708eac2a9bdef0",
-  "latency_ms": 2,
-  "recorded_at": "2026-08-18T04:24:45.177211+00:00",
-  "server_cmd": [
-    ".venv/bin/python",
-    "demo/good_server.py"
-  ]
+  "contract_sha256": "b2aca87ccc27431a921165d5a43945028af5e1f8bd06a43d2e24759898f7fccf",
+  "observation": {
+    "latency_ms": 1,
+    "recorded_at": "2026-08-20T19:31:38.920155+00:00",
+    "server_cmd": [
+      ".venv/bin/python",
+      "demo/good_server.py"
+    ]
+  }
 }

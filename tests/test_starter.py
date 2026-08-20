@@ -1,6 +1,7 @@
 """The starter template ships audit-clean: this test is that guarantee."""
 
 from _paths import ROOT, venv_python
+
 from mcpproof.checks.base import FAIL, MUST, PASS, SKIP, WARN
 from mcpproof.checks.conformance import run_conformance
 from mcpproof.checks.security import fetch_tools, run_security
@@ -19,9 +20,9 @@ async def test_starter_template_is_audit_clean():
     ]
     assert not must_bad, must_bad
 
-    # SHOULD-level, exactly WARN: the fastmcp stack negotiates 2025-11-25,
-    # not the latest spec revision — the template can't fix its SDK.
-    assert by_id["LIFE-02"].status == WARN, (by_id["LIFE-02"].status, by_id["LIFE-02"].evidence)
+    # the fastmcp stack negotiates 2025-11-25 — the newest revision the
+    # initialize handshake carries, so the template is fully current
+    assert by_id["LIFE-02"].status == PASS, (by_id["LIFE-02"].status, by_id["LIFE-02"].evidence)
 
     tools = await fetch_tools(STARTER_CMD)
     assert len(tools) == 3, [t.get("name") for t in tools]

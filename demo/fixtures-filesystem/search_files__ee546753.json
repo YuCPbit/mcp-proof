@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tool": "search_files",
   "case": "empty-string",
   "args": {
@@ -13,15 +13,20 @@
         "type": "text",
         "text": "No matches found"
       }
-    ]
+    ],
+    "structured": {
+      "content": "No matches found"
+    }
   },
-  "response_sha256": "93d54eb7ccc0aec036dda9c5734a44f64ebfa5ac8e2bc10eb98da31414191e5d",
-  "latency_ms": 0,
-  "recorded_at": "2026-08-20T11:56:17.684235+00:00",
-  "server_cmd": [
-    "npx",
-    "-y",
-    "@modelcontextprotocol/server-filesystem",
-    "/tmp/mcp-proof-sandbox"
-  ]
+  "contract_sha256": "3bb03d9d298a2919274512ff5bc6ea544e87aa1a42905f7b9987e9f220601532",
+  "observation": {
+    "latency_ms": 0,
+    "recorded_at": "2026-08-20T19:32:04.335254+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
 }

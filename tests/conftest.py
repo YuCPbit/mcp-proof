@@ -1,7 +1,5 @@
-from pathlib import Path
 
 import pytest
-
 from _paths import ROOT, venv_python
 
 PYTHON = venv_python()

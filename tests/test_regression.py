@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+from _paths import venv_python
+
 from mcpproof.provenance import obj_hash
 from mcpproof.regression import (
     DriftResult,
@@ -10,8 +12,6 @@ from mcpproof.regression import (
     sample_args,
     summarize,
 )
-
-from _paths import ROOT, venv_python
 
 PYTHON = venv_python()
 SERVER = str(Path(__file__).resolve().parent / "regression_target_server.py")
@@ -24,6 +24,10 @@ def server_cmd(drift: bool = False) -> list[str]:
     return cmd
 
 
+def _contract(fixture: dict) -> dict:
+    return {"tool": fixture["tool"], "args": fixture["args"], "response": fixture["response"]}
+
+
 async def test_record_writes_provenance_stamped_fixtures(tmp_path):
     paths = await record(server_cmd(), tmp_path)
     assert len(paths) == 3
@@ -32,20 +36,23 @@ async def test_record_writes_provenance_stamped_fixtures(tmp_path):
     for p in paths:
         fixture = json.loads(p.read_text(encoding="utf-8"))
         tools_seen.add(fixture["tool"])
-        assert fixture["schema_version"] == 2
-        assert fixture["response_sha256"] == obj_hash(fixture["response"])
-        assert fixture["server_cmd"] == server_cmd()
-        assert isinstance(fixture["latency_ms"], int)
+        assert fixture["schema_version"] == 3
+        # the hashed layer depends on behaviour only
+        assert fixture["contract_sha256"] == obj_hash(_contract(fixture))
+        # the observation layer carries context and stays out of every hash
+        assert fixture["observation"]["server_cmd"] == server_cmd()
+        assert isinstance(fixture["observation"]["latency_ms"], int)
+        assert "recorded_at" in fixture["observation"]
         assert fixture["response"]["is_error"] is False
         assert fixture["response"]["content"][0]["type"] == "text"
         assert p.name == f"{fixture['tool']}__{obj_hash(fixture['args'])[:8]}.json"
     assert tools_seen == {"echo", "price", "policy"}
     manifest = json.loads((tmp_path / "_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 2
+    assert manifest["schema_version"] == 3
     # manifest preserves recording order so stateful sequences replay correctly
     assert manifest["fixtures"] == [p.name for p in paths]
     recomputed = obj_hash(
-        sorted(obj_hash(json.loads(p.read_text(encoding="utf-8"))) for p in paths)
+        sorted(obj_hash(_contract(json.loads(p.read_text(encoding="utf-8")))) for p in paths)
     )
     assert manifest["fixtures_sha256"] == recomputed
 

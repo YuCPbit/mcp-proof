@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tool": "directory_tree",
   "case": "golden",
   "args": {
@@ -12,15 +12,18 @@
         "type": "text",
         "text": "ENOENT: no such file or directory, scandir '/tmp/mcp-proof-sandbox/example'"
       }
-    ]
+    ],
+    "structured": null
   },
-  "response_sha256": "719992fab52ab7139cb15354ecdb99795f8e113fa884996d76745bab350e157a",
-  "latency_ms": 0,
-  "recorded_at": "2026-08-20T11:56:17.680194+00:00",
-  "server_cmd": [
-    "npx",
-    "-y",
-    "@modelcontextprotocol/server-filesystem",
-    "/tmp/mcp-proof-sandbox"
-  ]
+  "contract_sha256": "705f4ee3dbff10d74c7756f61da9c24ae9eb78b6af9f263c595a42c1a571ca77",
+  "observation": {
+    "latency_ms": 0,
+    "recorded_at": "2026-08-20T19:32:04.327245+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
 }

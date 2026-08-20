@@ -20,7 +20,7 @@ reported as not auto-assessable — never as passed.
 
 from dataclasses import dataclass
 
-from .base import CheckResult, FAIL, PASS, SKIP
+from .base import FAIL, PASS, SKIP, CheckResult
 
 MSSS_VERSION = "v0.1"
 MSSS_MAPPING_VERSION = "control-level mapping v2.0 (2026-01-20)"

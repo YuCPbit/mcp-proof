@@ -1,3 +1,4 @@
+import os
 import socket
 import subprocess
 import time
@@ -5,11 +6,11 @@ from pathlib import Path
 
 import httpx
 import pytest
+from _paths import venv_python
 
 from mcpproof.client_http import HttpProbe, open_session_http
 
-ROOT = Path(__file__).resolve().parents[1]
-PYTHON = str(ROOT / ".venv" / "bin" / "python")
+PYTHON = venv_python()
 SERVER = str(Path(__file__).resolve().parent / "http_target_server.py")
 
 BOOT_DEADLINE = 15.0
@@ -19,6 +20,14 @@ def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
+
+
+def _server_unavailable(reason: str):
+    """Local dev without the target's env may skip; CI must never silently
+    lose HTTP transport coverage — a green run has to mean these tests ran."""
+    if os.environ.get("CI"):
+        pytest.fail(f"HTTP target server must boot in CI — {reason}")
+    pytest.skip(reason)
 
 
 @pytest.fixture(scope="module")
@@ -32,7 +41,7 @@ def http_url():
             stderr=subprocess.DEVNULL,
         )
     except OSError as exc:
-        pytest.skip(f"could not spawn HTTP target server: {exc}")
+        _server_unavailable(f"could not spawn HTTP target server: {exc}")
     try:
         deadline = time.monotonic() + BOOT_DEADLINE
         ready = False
@@ -46,7 +55,7 @@ def http_url():
             except httpx.TransportError:
                 time.sleep(0.15)
         if not ready:
-            pytest.skip("HTTP target server failed to boot; skipping HTTP transport tests")
+            _server_unavailable("HTTP target server failed to boot")
         yield url
     finally:
         proc.terminate()

@@ -3,10 +3,12 @@
 import re
 from collections import Counter
 
-from mcpproof.checks.base import CheckResult, FAIL, MUST, PASS, SKIP, WARN
-from mcpproof.checks.conformance import _CHECKS as CONFORMANCE_CHECKS, run_conformance
+from mcpproof.checks.base import FAIL, MUST, PASS, SKIP, WARN, CheckResult
+from mcpproof.checks.conformance import _CHECKS as CONFORMANCE_CHECKS
+from mcpproof.checks.conformance import run_conformance
 from mcpproof.checks.msss import CONTROLS, evaluate_msss
-from mcpproof.checks.security import _META as SECURITY_CHECKS, fetch_tools, run_security
+from mcpproof.checks.security import _META as SECURITY_CHECKS
+from mcpproof.checks.security import fetch_tools, run_security
 from mcpproof.report.builder import build_report
 
 _CONTROL_ID = re.compile(r"MCP-(FS|EXEC|NET|AUTHZ|INPUT|LOG|SUPPLY|DEPLOY)-\d{2}")

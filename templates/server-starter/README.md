@@ -13,9 +13,8 @@ that rewards it:
 | Failures raised as `ToolError` with an actionable message, not silent success | `lookup_order` unknown-ID branch | `TOOL-04`/`TOOL-05` error semantics |
 | A valid `examples` entry on constrained params, so clients pick callable values | `lookup_order.order_id` | exercises `TOOL-06` dynamic validation |
 
-One expected non-PASS: `LIFE-02` reports **WARN** because fastmcp currently
-negotiates spec `2025-11-25`, not the latest `2026-07-28` revision — that's the
-SDK, not this template.
+The template audits fully green: fastmcp negotiates `2025-11-25`, the newest
+revision the initialize handshake carries, so `LIFE-02` passes too.
 
 ## Delivery pipeline
 

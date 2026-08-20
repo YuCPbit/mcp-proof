@@ -4,9 +4,9 @@
 
 ### Ship an MCP server with a receipt.
 
-**One command audits any MCP server — and hands your client a signed, reproducible delivery report plus a CI regression suite they keep.**
+**One command audits an MCP server over stdio or Streamable HTTP — and hands your client a fingerprinted, reproducible delivery report plus a CI regression suite they keep.**
 
-[![tests](https://img.shields.io/badge/tests-36_passing-brightgreen)](tests/)
+[![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
 [![checks](https://img.shields.io/badge/checks-15_conformance_·_6_security-6a5acd)](src/mcpproof/checks/)
 [![transports](https://img.shields.io/badge/transports-stdio_·_HTTP-informational)](src/mcpproof/client_http.py)
@@ -24,12 +24,12 @@
 
 ## ✨ What you get
 
-- 🔍 **15 wire-level protocol checks** — mcp-proof speaks raw JSON-RPC to your server, so it verifies what actually crosses the wire: handshake completeness, exact error codes, tool-schema validity, structured-output correctness, stdout hygiene, pagination safety, and spec-version currency.
+- 🔍 **15 wire-level protocol checks** — mcp-proof speaks raw JSON-RPC to your server, so it verifies what actually crosses the wire: handshake completeness, exact error codes, tool-schema validity, structured-output correctness, stdout hygiene, pagination safety, and protocol-revision reporting. Capability-aware: a resources- or prompts-only server is never failed for lacking tools.
 - 🛡️ **Security audit tied to a public standard** — 6 deterministic checks (tool-description poisoning, invisible/bidi characters, leaked credentials, unconstrained injection surfaces, advertised shell execution), each mapped to canonical control IDs of the 24-control [MCP Server Security Standard](https://mcp-security-standard.org), rendered as a full compliance table in every report.
 - 📼 **A regression suite your client keeps** — golden fixtures with SHA-256 provenance freeze the server's behaviour; replay grades every drift (`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`), understands structured output, preserves stateful call order, and ships with a ready-to-paste GitHub Actions gate.
 - 📄 **A report non-engineers can read** — verdict banner, score tiles, per-finding evidence and fixes, MSSS table, and a priority-ordered **Recommended next steps** list. Self-contained HTML; add `--pdf` for a PDF.
-- 🔁 **Reproducible by design** — zero LLM calls, zero API keys, zero flakiness. Identical server behaviour produces an identical report fingerprint, so acceptance is verification, not trust.
-- 🧯 **Safe against live servers** — baselining skips mutating tools (`write_*`, `delete_*`, `exec`, …) unless you opt in with `--include-destructive`; `--edge-cases` additionally baselines oversized, empty, and injection-shaped inputs.
+- 🔁 **Reproducible by design** — zero LLM calls, zero API keys. Every hash is computed from behaviour alone — timestamps and latency live in a separate, unhashed observation layer — so identical server behaviour produces an identical report fingerprint and acceptance is verification, not trust.
+- 🧯 **Conservative auto-baselining** — mutating-looking tools (`write_*`, `delete_*`, `exec`, …) are skipped by default and listed in the manifest for review; opt in per run with `--include-destructive`. `--edge-cases` additionally baselines oversized, empty, and injection-shaped inputs.
 
 ## 🚀 Quick start
 
@@ -72,6 +72,16 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 Every lane feeds one report — and the report ends with a prioritized fix list, so it doubles as a remediation plan.
 
+## 📡 Protocol support
+
+| | |
+|---|---|
+| Transports | stdio ✅ · Streamable HTTP ✅ |
+| Protocol revisions | every initialize-handshake revision, `2024-11-05` → `2025-11-25` ✅ |
+| `2026-07-28` modern era (`server/discover`) | v0.3 — see the roadmap |
+
+Works with servers in **any language** — mcp-proof talks to the process (or URL), not to your codebase.
+
 ## 🏗️ Build on the audit-clean template
 
 Building a server rather than auditing one? [`templates/server-starter/`](templates/server-starter/) is a fastmcp server that passes this audit out of the box — constrained input schemas, proper error semantics, structured output, every practice annotated with the check ID it satisfies. Copy, implement your tools, audit, ship with the report.
@@ -84,11 +94,23 @@ Building a server rather than auditing one? [`templates/server-starter/`](templa
 | Linux | ✅ exercised in CI |
 | Windows | ✅ exercised in CI |
 
-Works with servers in **any language** — mcp-proof talks to the process (or URL), not to your codebase.
-
 ## 🗺️ Roadmap
 
-- Opt-in semantic lane (LLM-graded, promptfoo-compatible assertions) for teams that also want meaning-level checks — the core stays deterministic.
+| Release | Focus |
+|---|---|
+| v0.3 | Dual-era protocol support — `server/discover` + `_meta` (2026-07-28 modern era) alongside the legacy handshake, `--era auto\|modern\|legacy` |
+| v0.4 | Capability-aware resources & prompts lanes · contract manifest `inspect` / `diff` / `assert-no-breaking` |
+| v0.5 | JSON / JUnit / SARIF outputs · reusable GitHub Action |
+| v0.6 | Schema-driven boundary & negative test generation |
+| Later | Opt-in semantic lane (LLM-graded assertions) — parked until the deterministic core is complete |
+
+## 🔍 Limitations
+
+mcp-proof proves what can be proven deterministically, and says which is which:
+
+- Security checks cover the observable protocol and metadata surface. MSSS controls that need deployment, source or process evidence are always reported as **manual review** — never as passed.
+- Auto-baselining classifies tools by a conservative name/description heuristic. Review the skip list in the fixtures manifest before trusting a baseline recorded against production.
+- Semantic correctness (does the answer *mean* the right thing?) is outside the deterministic core by design.
 
 ## 📄 License
 

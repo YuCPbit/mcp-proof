@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tool": "directory_tree",
   "case": "empty-string",
   "args": {
@@ -12,15 +12,20 @@
         "type": "text",
         "text": "[]"
       }
-    ]
+    ],
+    "structured": {
+      "content": "[]"
+    }
   },
-  "response_sha256": "45afa0cad7c14a8e2df73e22ba15d3e8b64033ac7133b6c8c352a528058b05f4",
-  "latency_ms": 0,
-  "recorded_at": "2026-08-20T11:56:17.681960+00:00",
-  "server_cmd": [
-    "npx",
-    "-y",
-    "@modelcontextprotocol/server-filesystem",
-    "/tmp/mcp-proof-sandbox"
-  ]
+  "contract_sha256": "38baee575fa7a40a246c8b6e2ad4d16a7c96259ffa5fad19fbc1c67671ddeea0",
+  "observation": {
+    "latency_ms": 1,
+    "recorded_at": "2026-08-20T19:32:04.332191+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
 }

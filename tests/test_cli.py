@@ -3,7 +3,6 @@ targets, plus the reproducibility promise the README makes."""
 
 import re
 import subprocess
-from pathlib import Path
 
 from _paths import ROOT, venv_python
 

@@ -1,4 +1,5 @@
 from fastmcp import FastMCP
+
 mcp = FastMCP("smoke")
 
 @mcp.tool

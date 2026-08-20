@@ -23,7 +23,8 @@ async def test_good_server_conformance(good_server_cmd):
         (r.id, r.status, r.evidence) for r in results if r.level == MUST and r.status != PASS
     ]
     assert not must_not_pass, must_not_pass
-    assert by_id["LIFE-02"].status == WARN
+    # fastmcp negotiates 2025-11-25, the newest revision initialize can carry
+    assert by_id["LIFE-02"].status == PASS, by_id["LIFE-02"].evidence
     assert by_id["HYG-01"].status == PASS
 
 

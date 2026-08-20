@@ -16,7 +16,7 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-from . import __version__, LATEST_SPEC
+from . import LATEST_LEGACY_SPEC, __version__
 from .client import DEFAULT_TIMEOUT
 
 ACCEPT = "application/json, text/event-stream"
@@ -150,9 +150,9 @@ class HttpProbe:
         except _TRANSPORT_ERRORS:
             pass
 
-    async def initialize(self, protocol_version: str = LATEST_SPEC) -> dict | None:
-        """Handshake requesting the latest spec, so the negotiated version in the
-        response reveals whether the server has migrated."""
+    async def initialize(self, protocol_version: str = LATEST_LEGACY_SPEC) -> dict | None:
+        """Legacy-era handshake requesting the newest revision it can carry,
+        so the response reveals which revision the server negotiates."""
         resp = await self.request(
             "initialize",
             {

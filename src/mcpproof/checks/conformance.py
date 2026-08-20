@@ -8,7 +8,7 @@ from jsonschema import Draft202012Validator
 from jsonschema import validate as jsonschema_validate
 from jsonschema.exceptions import SchemaError, ValidationError
 
-from .. import KNOWN_SPECS, LATEST_SPEC
+from .. import KNOWN_SPECS, LATEST_LEGACY_SPEC, LATEST_SPEC
 from ..client import RawProbe
 from .base import FAIL, MUST, PASS, SHOULD, SKIP, WARN, CheckResult
 
@@ -19,9 +19,10 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
         "Return protocolVersion, capabilities and serverInfo in the initialize result.",
     ),
     "LIFE-02": (
-        f"server negotiates the latest spec revision ({LATEST_SPEC})",
+        f"server negotiates the newest handshake revision ({LATEST_LEGACY_SPEC})",
         SHOULD,
-        f"Upgrade the server SDK to a release that speaks the {LATEST_SPEC} spec revision.",
+        "Upgrade the server SDK to a release that negotiates the newest "
+        f"initialize-handshake revision ({LATEST_LEGACY_SPEC}).",
     ),
     "LIFE-03": (
         "server answers tools/list after the initialized notification",
@@ -113,6 +114,17 @@ async def _safe(coro):
         return None
 
 
+async def _failure_context(probe) -> str:
+    """Exit code + stderr tail, when the probe can produce them (stdio only)."""
+    collect = getattr(probe, "failure_context", None)
+    if collect is None:
+        return ""
+    try:
+        return await collect()
+    except Exception:
+        return ""
+
+
 async def run_conformance(cmd: list[str] | None, url: str | None = None) -> list[CheckResult]:
     try:
         if url:
@@ -129,7 +141,9 @@ async def run_conformance(cmd: list[str] | None, url: str | None = None) -> list
 async def _run_checks(probe: RawProbe) -> list[CheckResult]:
     init = await _safe(probe.initialize())
     if init is None:
-        return _handshake_failed("initialize timed out or transport failed")
+        detail = "initialize timed out or transport failed"
+        ctx = await _failure_context(probe)
+        return _handshake_failed(f"{detail} — {ctx}" if ctx else detail)
     if "result" not in init:
         return _handshake_failed(f"initialize returned error: {init.get('error')}")
 
@@ -143,19 +157,31 @@ async def _run_checks(probe: RawProbe) -> list[CheckResult]:
         results.append(_res("LIFE-01", PASS, "protocolVersion, capabilities and serverInfo all present"))
 
     negotiated = init_result.get("protocolVersion")
-    if negotiated == LATEST_SPEC:
-        results.append(_res("LIFE-02", PASS, f"negotiated {negotiated}"))
+    if negotiated == LATEST_LEGACY_SPEC:
+        results.append(_res(
+            "LIFE-02", PASS,
+            f"negotiated {negotiated}, the newest revision the initialize handshake carries",
+        ))
+    elif negotiated == LATEST_SPEC:
+        results.append(_res(
+            "LIFE-02", WARN,
+            f"negotiated {negotiated} over the legacy initialize handshake — the modern era "
+            "is announced via server/discover, which this handshake cannot verify",
+        ))
     elif negotiated in KNOWN_SPECS:
         results.append(_res(
             "LIFE-02", WARN,
-            f"requested {LATEST_SPEC}, negotiated {negotiated} — "
-            f"server not yet migrated to the {LATEST_SPEC} spec revision",
+            f"negotiated {negotiated}; the newest handshake revision is {LATEST_LEGACY_SPEC} — "
+            "a newer server SDK will negotiate it",
         ))
     else:
         results.append(_res(
             "LIFE-02", FAIL,
-            f"requested {LATEST_SPEC}, negotiated unknown version {negotiated!r}",
+            f"requested {LATEST_LEGACY_SPEC}, negotiated unknown revision {negotiated!r}",
         ))
+
+    caps = init_result.get("capabilities")
+    tools_declared = isinstance(caps, dict) and "tools" in caps
 
     tools_resp = await _safe(probe.request("tools/list"))
     tools_served = tools_resp is not None and "result" in tools_resp
@@ -164,13 +190,23 @@ async def _run_checks(probe: RawProbe) -> list[CheckResult]:
         raw = tools_resp["result"].get("tools")
         tools = raw if isinstance(raw, list) else []
         results.append(_res("LIFE-03", PASS, f"tools/list returned {len(tools)} tool(s) after initialized"))
+    elif not tools_declared:
+        # a resources- or prompts-only server is spec-legal: nothing to demand here
+        results.append(_res(
+            "LIFE-03", SKIP,
+            "capabilities do not declare tools and tools/list is not served — "
+            "no tools surface to check",
+        ))
     elif tools_resp is None:
         results.append(_res("LIFE-03", FAIL, "tools/list timed out after the initialized notification"))
     else:
         results.append(_res("LIFE-03", FAIL, f"tools/list returned error: {tools_resp.get('error')}"))
 
     if not tools_served:
-        results.append(_res("LIST-01", SKIP, "tools/list unavailable"))
+        results.append(_res(
+            "LIST-01", SKIP,
+            "tools/list unavailable" if tools_declared else "no tools surface to paginate",
+        ))
     else:
         cursor = tools_resp["result"].get("nextCursor")
         if not cursor:
@@ -223,7 +259,10 @@ async def _run_checks(probe: RawProbe) -> list[CheckResult]:
     else:
         results.append(_res("RPC-03", FAIL, "malformed tools/call params returned a result instead of an error"))
 
-    results.extend(await _tool_checks(probe, tools, tools_served))
+    results.extend(await _tool_checks(
+        probe, tools, tools_served,
+        skip_reason="tools/list failed" if tools_declared else "no tools surface to check",
+    ))
 
     if getattr(probe, "transport", "stdio") != "stdio":
         results.append(_res("HYG-01", SKIP, "stdout hygiene only applies to the stdio transport"))
@@ -235,13 +274,11 @@ async def _run_checks(probe: RawProbe) -> list[CheckResult]:
         else:
             results.append(_res("HYG-01", PASS, "no non-JSON-RPC stdout lines observed"))
 
-    caps = init_result.get("capabilities")
-    declared = isinstance(caps, dict) and "tools" in caps
-    if declared and tools_served:
+    if tools_declared and tools_served:
         results.append(_res("CAP-01", PASS, "capabilities.tools declared and tools/list served"))
-    elif not declared and not tools_served:
+    elif not tools_declared and not tools_served:
         results.append(_res("CAP-01", PASS, "capabilities.tools not declared and tools/list not served"))
-    elif declared:
+    elif tools_declared:
         results.append(_res("CAP-01", WARN, "capabilities declare tools but tools/list did not return a result"))
     else:
         results.append(_res(
@@ -252,10 +289,12 @@ async def _run_checks(probe: RawProbe) -> list[CheckResult]:
     return results
 
 
-async def _tool_checks(probe: RawProbe, tools: list, tools_served: bool) -> list[CheckResult]:
+async def _tool_checks(
+    probe: RawProbe, tools: list, tools_served: bool, skip_reason: str = "tools/list failed"
+) -> list[CheckResult]:
     if not tools_served:
         return [
-            _res(cid, SKIP, "tools/list failed")
+            _res(cid, SKIP, skip_reason)
             for cid in ("TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05", "TOOL-06")
         ]
 

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "tool": "list_directory_with_sizes",
   "case": "empty-string",
   "args": {
@@ -12,15 +12,20 @@
         "type": "text",
         "text": "\nTotal: 0 files, 0 directories\nCombined size: 0 B"
       }
-    ]
+    ],
+    "structured": {
+      "content": "\nTotal: 0 files, 0 directories\nCombined size: 0 B"
+    }
   },
-  "response_sha256": "b05e5c653b083d44ece1ba23b7a641ca7fa8d147a132adb3de4a8bdf44c11102",
-  "latency_ms": 0,
-  "recorded_at": "2026-08-20T11:56:17.679482+00:00",
-  "server_cmd": [
-    "npx",
-    "-y",
-    "@modelcontextprotocol/server-filesystem",
-    "/tmp/mcp-proof-sandbox"
-  ]
+  "contract_sha256": "1e8d82d8115efde3507252118f298af04c9a3acd69a5af432977b8e45bbda184",
+  "observation": {
+    "latency_ms": 0,
+    "recorded_at": "2026-08-20T19:32:04.326507+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
 }

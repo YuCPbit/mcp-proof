@@ -1,17 +1,18 @@
 """Aggregate lane results into the client-facing delivery report.
 
-The run hash covers inputs and outcomes (not the timestamp), so two runs that
-observe identical behaviour produce the identical fingerprint.
+The run hash covers inputs and behavioural outcomes — never timestamps,
+never latency measurements — so two runs that observe identical behaviour
+produce the identical fingerprint.
 """
 
 from dataclasses import asdict, is_dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .. import __version__, LATEST_SPEC
-from ..checks.base import CheckResult, FAIL, MUST, PASS, SHOULD, SKIP, WARN, must_score
+from .. import KNOWN_SPECS, LATEST_LEGACY_SPEC, __version__
+from ..checks.base import FAIL, MUST, PASS, SHOULD, SKIP, WARN, CheckResult
 from ..checks.msss import evaluate_msss
 from ..provenance import obj_hash
 
@@ -110,6 +111,8 @@ def build_report(
         drifting = s.get("breaking", 0) + s.get("value", 0) + s.get("error", 0)
         blockers.append(f"{drifting} behavioural drift(s)")
 
+    # LATENCY rows carry live measurements and the summary is derived data —
+    # both stay out of the fingerprint so it depends on behaviour only.
     run_hash = obj_hash(
         {
             "tool": {"name": "mcp-proof", "version": __version__},
@@ -118,12 +121,18 @@ def build_report(
             "conformance": conf,
             "security": sec,
             "regression": reg and {
-                "summary": reg.get("summary"),
-                "drifts": reg.get("drifts"),
+                "drifts": [d for d in reg.get("drifts", []) if d.get("kind") != "LATENCY"],
                 "fixtures_sha256": reg.get("fixtures_sha256"),
             },
         }
     )
+
+    if negotiated_protocol == LATEST_LEGACY_SPEC:
+        protocol_note = "newest initialize-handshake revision"
+    elif negotiated_protocol in KNOWN_SPECS:
+        protocol_note = f"newer revision available: {LATEST_LEGACY_SPEC}"
+    else:
+        protocol_note = ""
 
     env = Environment(
         loader=FileSystemLoader(_TEMPLATE_DIR),
@@ -132,11 +141,11 @@ def build_report(
     html = env.get_template("template.html").render(
         server_name=server_name,
         server_cmd=" ".join(server_cmd),
-        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
         tool_version=__version__,
         negotiated_protocol=negotiated_protocol or "unknown",
-        latest_spec=LATEST_SPEC,
-        migrated=(negotiated_protocol == LATEST_SPEC),
+        protocol_note=protocol_note,
+        latest_legacy_spec=LATEST_LEGACY_SPEC,
         run_hash=run_hash,
         conformance=conf,
         must_ok=must_ok,

@@ -13,7 +13,6 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..client import open_session
 from .recorder import normalize_response
 
 NEGATION_TOKENS = ("not", "no", "never", "cannot", "can't", "won't", "isn't", "refused")
@@ -77,7 +76,8 @@ async def replay(
                 continue
             latency_ms = int((time.perf_counter() - start) * 1000)
             results.append(_classify(path.name, tool, recorded, normalize_response(result)))
-            recorded_ms = int(fixture.get("latency_ms", 0) or 0)
+            observation = fixture.get("observation") or {}  # v3; ≤v2 kept it top-level
+            recorded_ms = int(observation.get("latency_ms", fixture.get("latency_ms", 0)) or 0)
             threshold = max(3 * recorded_ms, recorded_ms + 500)
             if latency_ms > threshold:
                 results.append(
@@ -97,6 +97,9 @@ def summarize(results: list[DriftResult]) -> dict:
         key = r.kind.lower()
         if key in counts:
             counts[key] += 1
+    # behaviour verdicts only: LATENCY rows are advisory extras, one fixture
+    # can carry both a content verdict and a latency row
+    counts["content_total"] = len(results) - counts["latency"]
     counts["gate_pass"] = not (counts["breaking"] or counts["value"] or counts["error"])
     return counts
 
@@ -203,7 +206,7 @@ def _value_drift(old_text: str, new_text: str) -> str | None:
     old_dates = _DATE_RE.findall(old_text)
     new_dates = _DATE_RE.findall(new_text)
     if old_dates != new_dates:
-        for a, b in zip(old_dates, new_dates):
+        for a, b in zip(old_dates, new_dates, strict=False):
             if a != b:
                 return f"date changed: {a} → {b}"
         return f"dates changed: {old_dates} → {new_dates}"
@@ -211,7 +214,7 @@ def _value_drift(old_text: str, new_text: str) -> str | None:
     old_nums = _numbers(_DATE_RE.sub(" ", old_text))
     new_nums = _numbers(_DATE_RE.sub(" ", new_text))
     if [v for _, v in old_nums] != [v for _, v in new_nums]:
-        for (old_tok, old_val), (new_tok, new_val) in zip(old_nums, new_nums):
+        for (old_tok, old_val), (new_tok, new_val) in zip(old_nums, new_nums, strict=False):
             if old_val != new_val:
                 return f"number changed: {old_tok} → {new_tok}"
         return f"numbers changed: {[t for t, _ in old_nums]} → {[t for t, _ in new_nums]}"
