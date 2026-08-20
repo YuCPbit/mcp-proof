@@ -3,6 +3,14 @@ import sys
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Legacy Windows consoles use narrow code pages; progress glyphs (→ ✓ ⚠)
+    # must degrade to replacement characters instead of crashing the CLI.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except Exception:
+                pass
     parser = argparse.ArgumentParser(
         prog="mcp-proof",
         description="Ship an MCP server with a receipt: deterministic conformance, "
