@@ -16,6 +16,7 @@ responses). Validation mirrors the spec's inbound ladder, in rung order:
 Planted-violation flags for negative tests:
   --omit-cache        tools/list drops ttlMs/cacheScope   (CACHE-01)
   --omit-result-type  results drop resultType             (RTYPE-01)
+  --price-total N     price returns N instead of 42.00     (VALUE drift)
 """
 
 import json
@@ -31,6 +32,11 @@ NAME_BEARING = {"tools/call": "name", "prompts/get": "name", "resources/read": "
 
 OMIT_CACHE = "--omit-cache" in sys.argv
 OMIT_RESULT_TYPE = "--omit-result-type" in sys.argv
+# behaviour knob for regression-drift tests: change what price returns
+PRICE_TOTAL = (
+    float(sys.argv[sys.argv.index("--price-total") + 1])
+    if "--price-total" in sys.argv else 42.0
+)
 
 TOOLS = [
     {
@@ -152,8 +158,8 @@ def handle(method: str, params, headers=None) -> tuple[str, dict]:
             if not isinstance(args.get("item"), str):
                 return "error", _error(-32602, "price requires arguments.item (string)")
             return "result", _result({
-                "content": [{"type": "text", "text": "Total: $42.00"}],
-                "structuredContent": {"total": 42.0, "currency": "USD"},
+                "content": [{"type": "text", "text": f"Total: ${PRICE_TOTAL:.2f}"}],
+                "structuredContent": {"total": PRICE_TOTAL, "currency": "USD"},
                 "isError": False,
             })
         return "error", _error(-32602, f"unknown tool: {name}")

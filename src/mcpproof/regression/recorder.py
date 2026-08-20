@@ -98,7 +98,18 @@ def _utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _session_ctx(cmd: list[str] | None, url: str | None):
+async def _session_ctx(cmd: list[str] | None, url: str | None, era: str = "auto"):
+    """The era decides which session speaks to the server: the pinned 1.x SDK
+    for the initialize handshake, the probe-backed adapter for 2026-07-28
+    modern-only servers (see client_modern.py for why not the 2.x SDK)."""
+    from ..era import MODERN, sniff_era
+
+    if era == "auto":
+        era = await sniff_era(cmd, url)
+    if era == MODERN:
+        from ..client_modern import open_modern_session
+
+        return open_modern_session(cmd, url)
     if url:
         from ..client_http import open_session_http
 
@@ -114,13 +125,14 @@ async def record(
     skipped_out: list[str] | None = None,
     edge_cases: bool = False,
     url: str | None = None,
+    era: str = "auto",
 ) -> list[Path]:
     fixtures_dir = Path(fixtures_dir)
     fixtures_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     contract_hashes: list[str] = []
     skipped: list[str] = skipped_out if skipped_out is not None else []
-    async with _session_ctx(cmd, url) as session:
+    async with await _session_ctx(cmd, url, era) as session:
         entries: list[tuple[str, dict, str]]
         if calls is None:
             listing = await session.list_tools()

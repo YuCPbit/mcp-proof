@@ -144,10 +144,61 @@ async def test_modern_over_http_including_header_enforcement(modern_http_url):
     assert by_id["VER-01"].status == PASS
 
 
+# ------------------------------------------- regression lane, modern era ----
+
+
+async def test_record_and_replay_against_modern_server(tmp_path):
+    from mcpproof.regression.recorder import record
+    from mcpproof.regression.replayer import replay, summarize
+
+    paths = await record(modern_cmd(), tmp_path)
+    assert {p.name.split("__")[0] for p in paths} == {"echo", "price"}
+    import json
+
+    price_fixture = json.loads(
+        next(p for p in paths if p.name.startswith("price")).read_text()
+    )
+    assert price_fixture["response"]["structured"] == {"total": 42.0, "currency": "USD"}
+    assert price_fixture["contract_sha256"]
+
+    summary = summarize(await replay(modern_cmd(), tmp_path))
+    assert summary["gate_pass"], summary
+    assert summary["ok"] == len(paths)
+
+
+async def test_modern_value_drift_detected(tmp_path):
+    from mcpproof.regression.recorder import record
+    from mcpproof.regression.replayer import replay
+
+    await record(modern_cmd(), tmp_path)
+    drifts = await replay(modern_cmd("--price-total", "43"), tmp_path)
+    by_tool = {d.tool: d for d in drifts if d.kind != "OK"}
+    assert "price" in by_tool, drifts
+    assert by_tool["price"].kind == "VALUE"
+    assert "42" in by_tool["price"].detail and "43" in by_tool["price"].detail
+
+
+async def test_record_and_replay_modern_over_http(modern_http_url, tmp_path):
+    from mcpproof.regression.recorder import record
+    from mcpproof.regression.replayer import replay, summarize
+
+    paths = await record(None, tmp_path, url=modern_http_url)
+    assert len(paths) == 2
+    summary = summarize(await replay(None, tmp_path, url=modern_http_url))
+    assert summary["gate_pass"], summary
+
+
+async def test_explicit_legacy_era_still_rides_the_sdk(good_server_cmd, tmp_path):
+    from mcpproof.regression.recorder import record
+
+    paths = await record(good_server_cmd, tmp_path, era="legacy")
+    assert paths, "legacy-era recording must keep working through the SDK session"
+
+
 # ------------------------------------------------------------- CLI e2e ----
 
 
-def test_cli_run_modern_server_reports_era(tmp_path):
+def test_cli_run_modern_server_full_three_lanes(tmp_path):
     out = tmp_path / "report.html"
     proc = subprocess.run(
         [PYTHON, "-m", "mcpproof.cli", "run", PYTHON, SERVER,
@@ -156,8 +207,10 @@ def test_cli_run_modern_server_reports_era(tmp_path):
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "modern era" in proc.stdout
-    assert "regression lane skipped" in proc.stdout, proc.stdout
+    assert "replaying fixtures" in proc.stdout, proc.stdout
+    assert "drift gate: PASS" in proc.stdout, proc.stdout
     html = out.read_text(encoding="utf-8")
     assert "SHIP-READY" in html and "NOT SHIP-READY" not in html
     assert "modern era (server/discover)" in html
     assert "selected" in html and "2026-07-28" in html
+    assert (tmp_path / "fx" / "_manifest.json").exists()

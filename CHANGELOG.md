@@ -20,8 +20,18 @@ the legacy initialize handshake.
   directions (`scripts/crosscheck_modern_server.py`): the official client adopts it via
   `server/discover`, and mcp-proof audits an official v2 SDK server fully green.
 - Report header and fingerprint now carry the protocol era and discovery method.
-- Modern-only servers: the regression lane (which rides the legacy client SDK) reports itself
-  skipped instead of crashing; the SDK-side migration is the remaining v0.3 work.
+- **Dual-era regression sessions**: the recorder and replayer pick their session by era —
+  the pinned 1.x SDK for handshake-era servers (unchanged, battle-tested), a probe-backed
+  session (`client_modern.py`) for 2026-07-28 servers. Repinning onto the 2.x SDK was not an
+  option: the fastmcp dev targets require `mcp<2.0`, so the two SDKs can never share a venv.
+  The probe session paginates tools/list, stamps the `_meta` envelope and the SEP-2243 routing
+  headers on every call, and mirrors the SDK contract (protocol errors raise, `isError` results
+  return) so the recorder, replayer and fixture format are untouched. `--era` is now accepted by
+  `record` and `replay` too; `run` reuses the era the conformance lane already detected.
+- End-to-end against the official v2 SDK: all three lanes run fully green — including recorded
+  and replayed fixtures — on official servers over **both transports**, stdio and Streamable
+  HTTP with SSE responses, and HTTP-01 confirms the official transport enforces `Mcp-Method`
+  header mismatches with `-32020`.
 
 ## 0.2.1 — 2026-08-21
 

@@ -65,6 +65,30 @@ class EraInfo:
     raw_result: dict = field(default_factory=dict)  # the discover/initialize result object
 
 
+async def sniff_era(cmd: list[str] | None, url: str | None = None, timeout: float = 8.0) -> str:
+    """MODERN when the server answers server/discover with a mutually
+    supported modern revision; LEGACY otherwise — the official client's
+    denylist policy. One short-lived probe; the caller opens its own session
+    afterwards, so a dual-era server's connection-locking never bites."""
+    if url:
+        from .client_http import HttpProbe
+
+        ctx = HttpProbe(url)
+    else:
+        from .client import RawProbe
+
+        ctx = RawProbe(cmd)
+    try:
+        async with ctx as probe:
+            probe.enable_modern(LATEST_SPEC)
+            resp = await probe.request("server/discover", {}, timeout=timeout)
+            result = resp.get("result") if isinstance(resp, dict) else None
+            info = parse_discover_result(result) if isinstance(result, dict) else None
+            return MODERN if info is not None else LEGACY
+    except Exception:
+        return LEGACY
+
+
 def parse_discover_result(result: dict) -> EraInfo | None:
     """EraInfo from a server/discover result — None when the result is not
     positive modern evidence (mirrors the official denylist policy: a server

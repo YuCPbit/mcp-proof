@@ -46,7 +46,7 @@ def _export_pdf(html_path: Path) -> Path | None:
     return pdf_path
 
 
-async def _regression_lane(args, cmd: list[str] | None, url: str | None) -> dict:
+async def _regression_lane(args, cmd: list[str] | None, url: str | None, era: str = "auto") -> dict:
     from .regression.ci_template import github_action_yaml
     from .regression.recorder import record
     from .regression.replayer import replay, summarize
@@ -58,12 +58,12 @@ async def _regression_lane(args, cmd: list[str] | None, url: str | None) -> dict
         skipped: list[str] = []
         await record(cmd, fdir, include_destructive=args.include_destructive,
                      skipped_out=skipped, edge_cases=getattr(args, "edge_cases", False),
-                     url=url)
+                     url=url, era=era)
         if skipped:
             print(f"  ⚠ skipped {len(skipped)} potentially destructive tool(s): "
                   f"{', '.join(skipped)} (--include-destructive to record them)")
     print("→ regression lane: replaying fixtures")
-    drifts = await replay(cmd, fdir, url=url)
+    drifts = await replay(cmd, fdir, url=url, era=era)
     fixtures_sha = ""
     if manifest.exists():
         fixtures_sha = json.loads(manifest.read_text()).get("fixtures_sha256", "")
@@ -79,7 +79,6 @@ async def _regression_lane(args, cmd: list[str] | None, url: str | None) -> dict
 async def _cmd_run(args) -> int:
     from .checks.conformance import run_conformance
     from .checks.security import run_security
-    from .era import MODERN
 
     cmd = args.server_cmd or None
     url = getattr(args, "url", None)
@@ -110,16 +109,9 @@ async def _cmd_run(args) -> int:
 
     regression = None
     if args.fixtures:
-        try:
-            regression = await _regression_lane(args, cmd, url)
-        except Exception as exc:
-            if outcome.era != MODERN:
-                raise
-            # the recorder rides the legacy SDK session; a modern-only server
-            # rejects it — an audit gap to report, not a crash
-            print(f"  ⚠ regression lane skipped: the recorder speaks the legacy handshake, "
-                  f"which this modern-era server rejected ({type(exc).__name__}); "
-                  "SDK-session modernization is tracked for a later v0.3 increment")
+        # the conformance lane already learned the era — the regression lane
+        # rides the same verdict instead of sniffing again
+        regression = await _regression_lane(args, cmd, url, era=outcome.era)
 
     out = build_report(
         server_name=server_name,
@@ -158,7 +150,7 @@ async def _cmd_record(args) -> int:
     paths = await record(args.server_cmd or None, Path(args.fixtures),
                          include_destructive=args.include_destructive, skipped_out=skipped,
                          edge_cases=getattr(args, "edge_cases", False),
-                         url=getattr(args, "url", None))
+                         url=getattr(args, "url", None), era=getattr(args, "era", "auto"))
     print(f"✓ recorded {len(paths)} fixtures into {args.fixtures}")
     if skipped:
         print(f"⚠ skipped {len(skipped)} potentially destructive tool(s): "
@@ -170,7 +162,7 @@ async def _cmd_replay(args) -> int:
     from .regression.replayer import replay, summarize
 
     drifts = await replay(args.server_cmd or None, Path(args.fixtures),
-                          url=getattr(args, "url", None))
+                          url=getattr(args, "url", None), era=getattr(args, "era", "auto"))
     summary = summarize(drifts)
     for d in drifts:
         if d.kind != "OK":

@@ -49,6 +49,11 @@ def main(argv: list[str] | None = None) -> int:
     rec_p = sub.add_parser("record", help="Record golden fixtures from live tool calls")
     rec_p.add_argument("server_cmd", nargs="*")
     rec_p.add_argument("--url", default=None, help="Record from a running Streamable-HTTP server")
+    rec_p.add_argument(
+        "--era", choices=["auto", "modern", "legacy"], default="auto",
+        help="Protocol era for the session: auto probes server/discover first "
+             "(default: auto)",
+    )
     rec_p.add_argument("--fixtures", default="fixtures", help="Output fixtures dir")
     rec_p.add_argument(
         "--include-destructive", action="store_true",
@@ -62,6 +67,11 @@ def main(argv: list[str] | None = None) -> int:
     rep_p = sub.add_parser("replay", help="Replay fixtures and report drift (CI gate)")
     rep_p.add_argument("server_cmd", nargs="*")
     rep_p.add_argument("--url", default=None, help="Replay against a running Streamable-HTTP server")
+    rep_p.add_argument(
+        "--era", choices=["auto", "modern", "legacy"], default="auto",
+        help="Protocol era for the session: auto probes server/discover first "
+             "(default: auto)",
+    )
     rep_p.add_argument("--fixtures", default="fixtures")
 
     args = parser.parse_args(argv)
