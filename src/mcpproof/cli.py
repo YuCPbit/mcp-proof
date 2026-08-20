@@ -74,8 +74,35 @@ def main(argv: list[str] | None = None) -> int:
     )
     rep_p.add_argument("--fixtures", default="fixtures")
 
+    plan_p = sub.add_parser("plan", help="Show which tools auto-baselining would call, and why")
+    plan_p.add_argument("server_cmd", nargs="*")
+    plan_p.add_argument("--url", default=None, help="Plan against a running Streamable-HTTP server")
+    plan_p.add_argument(
+        "--era", choices=["auto", "modern", "legacy"], default="auto",
+        help="Protocol era for the session (default: auto)",
+    )
+
+    ins_p = sub.add_parser("inspect", help="Capture the server's contract manifest as JSON")
+    ins_p.add_argument("server_cmd", nargs="*")
+    ins_p.add_argument("--url", default=None, help="Inspect a running Streamable-HTTP server")
+    ins_p.add_argument(
+        "--era", choices=["auto", "modern", "legacy"], default="auto",
+        help="Protocol era for the session (default: auto)",
+    )
+    ins_p.add_argument("--out", default="mcp-contract.json", help="Manifest output path")
+
+    diff_p = sub.add_parser(
+        "diff", help="Classify contract changes between two manifests (CI gate: exit 1 on BREAKING)"
+    )
+    diff_p.add_argument("baseline", help="Baseline manifest JSON (from `mcp-proof inspect`)")
+    diff_p.add_argument("current", help="Current manifest JSON")
+    diff_p.add_argument(
+        "--fail-on", choices=["breaking", "any", "never"], default="breaking",
+        help="Exit non-zero on this class of change (default: breaking)",
+    )
+
     args = parser.parse_args(argv)
-    if bool(args.server_cmd) == bool(args.url):
+    if args.command != "diff" and bool(args.server_cmd) == bool(args.url):
         parser.error("provide either a server command (stdio) or --url (HTTP), not both/neither")
 
     from .runner import dispatch  # deferred: keeps --help fast

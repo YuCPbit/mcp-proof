@@ -147,6 +147,16 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
         SHOULD,
         "Declare capabilities.tools exactly when the server serves tools/list.",
     ),
+    "CAP-02": (
+        "declared capabilities match served features (resources)",
+        SHOULD,
+        "Declare capabilities.resources exactly when the server serves resources/list.",
+    ),
+    "CAP-03": (
+        "declared capabilities match served features (prompts)",
+        SHOULD,
+        "Declare capabilities.prompts exactly when the server serves prompts/list.",
+    ),
     "LIST-01": (
         "tools/list pagination terminates (no cursor loop)",
         MUST,
@@ -157,12 +167,51 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
         MUST,
         "Ship a structuredContent that validates against the declared outputSchema.",
     ),
+    "RES-01": (
+        "advertised resources capability serves resources/list",
+        MUST,
+        "Answer resources/list with a result when capabilities declare resources.",
+    ),
+    "RES-02": (
+        "every resource carries a uri and a name",
+        MUST,
+        "Give every entry in resources/list a non-empty uri and name.",
+    ),
+    "RES-03": (
+        "resources/read returns contents for an advertised resource",
+        MUST,
+        "Serve resources/read for every resource resources/list advertises; "
+        "each content entry must carry its uri.",
+    ),
+    "RES-04": (
+        "resources/list pagination terminates (no cursor loop)",
+        MUST,
+        "Return a nextCursor that advances and eventually ends; a repeating cursor hangs clients.",
+    ),
+    "PROMPT-01": (
+        "advertised prompts capability serves prompts/list",
+        MUST,
+        "Answer prompts/list with a result when capabilities declare prompts.",
+    ),
+    "PROMPT-02": (
+        "every prompt has a name and well-formed argument metadata",
+        MUST,
+        "Give every prompt a non-empty name; every declared argument needs a name.",
+    ),
+    "PROMPT-03": (
+        "prompts/get rejects a call missing required arguments",
+        MUST,
+        "Validate prompt arguments and return an error when required ones are missing.",
+    ),
 }
 
 _SHARED_IDS = (
     "RPC-01", "RPC-02", "RPC-03",
     "TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05", "TOOL-06",
     "LIST-01", "HYG-01", "CAP-01",
+    "RES-01", "RES-02", "RES-03", "RES-04",
+    "PROMPT-01", "PROMPT-02", "PROMPT-03",
+    "CAP-02", "CAP-03",
 )
 _LEGACY_IDS = ("LIFE-01", "LIFE-02", "LIFE-03", *_SHARED_IDS)
 _MODERN_IDS = (
@@ -358,8 +407,9 @@ async def _run_legacy_checks(probe) -> tuple[list[CheckResult], dict, list]:
         probe, tools, tools_served,
         skip_reason="tools/list failed" if tools_declared else "no tools surface to check",
     ))
+    results.extend(await _surface_checks(probe, caps if isinstance(caps, dict) else {}))
     results.append(_hygiene_check(probe))
-    results.append(_cap_check(tools_declared, tools_served, len(tools)))
+    results.append(_cap_check("CAP-01", "tools", tools_declared, tools_served, len(tools)))
 
     probe.mcp_proof_tools = tools  # stashed for the outcome
     return results, init_result, tools
@@ -457,22 +507,31 @@ async def _run_modern_checks(probe, info: EraInfo) -> list[CheckResult]:
             else:
                 results.append(_res("ORD-01", WARN, f"tool order differs between calls: {first} vs {second}"))
 
-    # CacheableResult fields (MUST on list results, SEP-2549)
-    if not tools_served:
-        results.append(_res("CACHE-01", SKIP, "tools/list unavailable"))
+    results.extend(await _surface_checks(probe, info.capabilities))
+
+    # CacheableResult fields (MUST, SEP-2549) on every cacheable result the
+    # session observed: tools/resources/prompts lists and resources/read
+    cacheable = [
+        (method, r) for method, r in getattr(probe, "observed_results", [])
+        if method in ("tools/list", "resources/list", "prompts/list",
+                      "resources/read", "resources/templates/list")
+    ]
+    problems = []
+    for method, r in cacheable:
+        if not isinstance(r.get("ttlMs"), int | float):
+            problems.append(f"{method}: ttlMs missing or non-numeric")
+        elif r.get("cacheScope") not in ("public", "private"):
+            problems.append(f"{method}: cacheScope missing or invalid ({r.get('cacheScope')!r})")
+    if not cacheable:
+        results.append(_res("CACHE-01", SKIP, "no cacheable results observed"))
+    elif problems:
+        results.append(_res("CACHE-01", FAIL, "; ".join(sorted(set(problems))[:6])))
     else:
-        listing = tools_resp["result"]
-        ttl = listing.get("ttlMs")
-        scope = listing.get("cacheScope")
-        problems = []
-        if not isinstance(ttl, int | float):
-            problems.append(f"ttlMs missing or non-numeric ({ttl!r})")
-        if scope not in ("public", "private"):
-            problems.append(f'cacheScope missing or invalid ({scope!r}, expected "public"/"private")')
-        if problems:
-            results.append(_res("CACHE-01", FAIL, "; ".join(problems)))
-        else:
-            results.append(_res("CACHE-01", PASS, f"ttlMs={ttl}, cacheScope={scope}"))
+        results.append(_res(
+            "CACHE-01", PASS,
+            f"all {len(cacheable)} cacheable result(s) carry ttlMs and cacheScope "
+            f"({', '.join(sorted({m for m, _ in cacheable}))})",
+        ))
 
     # resultType on every observed result (required at 2026-07-28)
     observed = getattr(probe, "observed_results", [])
@@ -507,7 +566,7 @@ async def _run_modern_checks(probe, info: EraInfo) -> list[CheckResult]:
         results.append(_res("META-01", WARN, "no result carries io.modelcontextprotocol/serverInfo in _meta"))
 
     results.append(_hygiene_check(probe))
-    results.append(_cap_check(tools_declared, tools_served, len(tools)))
+    results.append(_cap_check("CAP-01", "tools", tools_declared, tools_served, len(tools)))
 
     probe.mcp_proof_tools = tools
     return results
@@ -535,33 +594,36 @@ async def _header_check(probe) -> CheckResult:
 # --------------------------------------------------------------------------
 
 
-async def _pagination_check(probe, tools_resp, tools_declared: bool, tools_served: bool) -> CheckResult:
-    if not tools_served:
+async def _pagination_check(
+    probe, first_resp, declared: bool, served: bool,
+    *, check_id: str = "LIST-01", method: str = "tools/list",
+) -> CheckResult:
+    if not served:
         return _res(
-            "LIST-01", SKIP,
-            "tools/list unavailable" if tools_declared else "no tools surface to paginate",
+            check_id, SKIP,
+            f"{method} unavailable" if declared else "no surface to paginate",
         )
-    cursor = tools_resp["result"].get("nextCursor")
+    cursor = first_resp["result"].get("nextCursor")
     if not cursor:
-        return _res("LIST-01", PASS, "single page, no pagination cursor")
+        return _res(check_id, PASS, "single page, no pagination cursor")
     seen = {cursor}
     pages = 1
     while cursor:
-        page = await _safe(probe.request("tools/list", {"cursor": cursor}))
+        page = await _safe(probe.request(method, {"cursor": cursor}))
         if page is None or "result" not in page:
-            return _res("LIST-01", FAIL, f"pagination broke at page {pages + 1}")
+            return _res(check_id, FAIL, f"pagination broke at page {pages + 1}")
         pages += 1
         cursor = page["result"].get("nextCursor")
         if cursor in seen:
             return _res(
-                "LIST-01", FAIL,
+                check_id, FAIL,
                 f"cursor repeats after {pages} pages — clients following it loop forever",
             )
         if cursor:
             seen.add(cursor)
         if pages > 20:
-            return _res("LIST-01", FAIL, "more than 20 pages — suspected unbounded pagination")
-    return _res("LIST-01", PASS, f"pagination terminates after {pages} page(s)")
+            return _res(check_id, FAIL, "more than 20 pages — suspected unbounded pagination")
+    return _res(check_id, PASS, f"pagination terminates after {pages} page(s)")
 
 
 async def _rpc_checks(probe) -> list[CheckResult]:
@@ -602,17 +664,146 @@ def _hygiene_check(probe) -> CheckResult:
     return _res("HYG-01", PASS, "no non-JSON-RPC stdout lines observed")
 
 
-def _cap_check(tools_declared: bool, tools_served: bool, n_tools: int) -> CheckResult:
-    if tools_declared and tools_served:
-        return _res("CAP-01", PASS, "capabilities.tools declared and tools/list served")
-    if not tools_declared and not tools_served:
-        return _res("CAP-01", PASS, "capabilities.tools not declared and tools/list not served")
-    if tools_declared:
-        return _res("CAP-01", WARN, "capabilities declare tools but tools/list did not return a result")
+def _cap_check(check_id: str, surface: str, declared: bool, served: bool, n: int) -> CheckResult:
+    if declared and served:
+        return _res(check_id, PASS, f"capabilities.{surface} declared and {surface}/list served")
+    if not declared and not served:
+        return _res(check_id, PASS, f"capabilities.{surface} not declared and {surface}/list not served")
+    if declared:
+        return _res(check_id, WARN, f"capabilities declare {surface} but {surface}/list did not return a result")
     return _res(
-        "CAP-01", WARN,
-        f"tools/list returned {n_tools} tool(s) but capabilities do not declare tools",
+        check_id, WARN,
+        f"{surface}/list returned {n} item(s) but capabilities do not declare {surface}",
     )
+
+
+async def _surface_checks(probe, caps: dict) -> list[CheckResult]:
+    """Capability-aware resources and prompts lanes, shared across eras."""
+    results: list[CheckResult] = []
+
+    # ---- resources ----
+    declared = isinstance(caps, dict) and "resources" in caps
+    resp = await _safe(probe.request("resources/list"))
+    served = resp is not None and "result" in resp
+    resources: list[dict] = []
+    if served:
+        raw = resp["result"].get("resources")
+        resources = [r for r in raw if isinstance(r, dict)] if isinstance(raw, list) else []
+
+    if declared and served:
+        results.append(_res("RES-01", PASS, f"resources/list returned {len(resources)} resource(s)"))
+    elif declared:
+        detail = "timed out (no response)" if resp is None else f"returned error: {resp.get('error')}"
+        results.append(_res("RES-01", FAIL, f"capabilities declare resources but resources/list {detail}"))
+    else:
+        results.append(_res("RES-01", SKIP, "resources capability not advertised"))
+
+    if not served:
+        results.append(_res("RES-02", SKIP, "resources/list unavailable"))
+    else:
+        offenders = [
+            f"resource[{i}]: missing {', '.join(k for k in ('uri', 'name') if not r.get(k))}"
+            for i, r in enumerate(resources)
+            if not r.get("uri") or not r.get("name")
+        ]
+        if offenders:
+            results.append(_res("RES-02", FAIL, "; ".join(offenders)))
+        else:
+            results.append(_res("RES-02", PASS, f"all {len(resources)} resource(s) carry a uri and a name"))
+
+    first = next((r for r in resources if r.get("uri")), None)
+    if first is None:
+        results.append(_res("RES-03", SKIP, "no listed resource to read"))
+    else:
+        uri = first["uri"]
+        read = await _safe(probe.request("resources/read", {"uri": uri}))
+        contents = (
+            read["result"].get("contents")
+            if read is not None and isinstance(read.get("result"), dict) else None
+        )
+        if read is None:
+            results.append(_res("RES-03", FAIL, f"resources/read {uri} timed out (no response)"))
+        elif "error" in read:
+            results.append(_res(
+                "RES-03", FAIL,
+                f"resources/read {uri} rejected its own advertised resource: {read['error']}",
+            ))
+        elif not isinstance(contents, list) or not contents:
+            results.append(_res("RES-03", FAIL, f"resources/read {uri} returned no contents list"))
+        elif any(not isinstance(c, dict) or not c.get("uri") for c in contents):
+            results.append(_res("RES-03", FAIL, f"resources/read {uri}: content entries missing their uri"))
+        else:
+            results.append(_res("RES-03", PASS, f"read {uri}: {len(contents)} content entr(y/ies), uri echoed"))
+
+    results.append(await _pagination_check(
+        probe, resp, declared, served, check_id="RES-04", method="resources/list",
+    ))
+
+    # ---- prompts ----
+    p_declared = isinstance(caps, dict) and "prompts" in caps
+    p_resp = await _safe(probe.request("prompts/list"))
+    p_served = p_resp is not None and "result" in p_resp
+    prompts: list[dict] = []
+    if p_served:
+        raw = p_resp["result"].get("prompts")
+        prompts = [p for p in raw if isinstance(p, dict)] if isinstance(raw, list) else []
+
+    if p_declared and p_served:
+        results.append(_res("PROMPT-01", PASS, f"prompts/list returned {len(prompts)} prompt(s)"))
+    elif p_declared:
+        detail = "timed out (no response)" if p_resp is None else f"returned error: {p_resp.get('error')}"
+        results.append(_res("PROMPT-01", FAIL, f"capabilities declare prompts but prompts/list {detail}"))
+    else:
+        results.append(_res("PROMPT-01", SKIP, "prompts capability not advertised"))
+
+    if not p_served:
+        results.append(_res("PROMPT-02", SKIP, "prompts/list unavailable"))
+    else:
+        offenders = []
+        for i, p in enumerate(prompts):
+            if not p.get("name"):
+                offenders.append(f"prompt[{i}]: empty name")
+                continue
+            args = p.get("arguments")
+            if args is not None and (
+                not isinstance(args, list)
+                or any(not isinstance(a, dict) or not a.get("name") for a in args)
+            ):
+                offenders.append(f"{p['name']}: malformed argument metadata")
+        if offenders:
+            results.append(_res("PROMPT-02", FAIL, "; ".join(offenders)))
+        else:
+            results.append(_res("PROMPT-02", PASS, f"all {len(prompts)} prompt(s) carry valid metadata"))
+
+    demanding = next(
+        (
+            p for p in prompts
+            if p.get("name") and isinstance(p.get("arguments"), list)
+            and any(isinstance(a, dict) and a.get("required") for a in p["arguments"])
+        ),
+        None,
+    )
+    if demanding is None:
+        results.append(_res("PROMPT-03", SKIP, "no prompt declares required arguments"))
+    else:
+        name = demanding["name"]
+        got = await _safe(probe.request("prompts/get", {"name": name, "arguments": {}}))
+        if got is None:
+            results.append(_res("PROMPT-03", FAIL, f"prompts/get {name} with empty args timed out"))
+        elif "error" in got:
+            results.append(_res(
+                "PROMPT-03", PASS,
+                f"{name} with empty args rejected (code {got['error'].get('code')})",
+            ))
+        else:
+            results.append(_res(
+                "PROMPT-03", FAIL,
+                f"prompts/get {name} missing its required argument returned a normal result",
+            ))
+
+    results.append(_cap_check("CAP-02", "resources", declared, served, len(resources)))
+    results.append(_cap_check("CAP-03", "prompts", p_declared, p_served, len(prompts)))
+    return results
 
 
 async def _tool_checks(
@@ -717,7 +908,7 @@ async def _tool_checks(
 
 
 async def _output_schema_check(probe, tools: list) -> CheckResult:
-    from ..regression.recorder import is_destructive
+    from ..regression.recorder import classify_tool
     from ..regression.sampler import sample_args
 
     declaring = [
@@ -737,8 +928,13 @@ async def _output_schema_check(probe, tools: list) -> CheckResult:
         return _res("TOOL-06", FAIL, "outputSchema does not compile: " + "; ".join(bad))
 
     # dynamic half: call one side-effect-safe declaring tool for real
+    # (annotations outrank the name heuristic — see classify_tool)
     candidate = next(
-        (t for t in declaring if not is_destructive(t["name"], t.get("description"))), None
+        (
+            t for t in declaring
+            if classify_tool(t["name"], t.get("description"), t.get("annotations"))[0] == "auto"
+        ),
+        None,
     )
     compiled = f"all {len(declaring)} outputSchema(s) compile"
     if candidate is None:

@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.0 — 2026-08-21
+
+The conformance lane now covers every MCP surface, and the audit gains its static half:
+a contract manifest with a breaking-change gate.
+
+- **Capability-aware resources & prompts lanes** (both eras): RES-01..04 — an advertised
+  resources capability must serve `resources/list`, every resource carries a uri and name,
+  `resources/read` works for advertised resources, pagination terminates; PROMPT-01..03 —
+  prompts/list served when declared, metadata well-formed, missing required arguments
+  rejected; CAP-02/CAP-03 — declared↔served consistency per surface. Surfaces a server
+  does not advertise are skipped, never failed. CACHE-01 (modern) now validates
+  `ttlMs`/`cacheScope` on **every** cacheable result the session observed.
+- **Contract engine**: `mcp-proof inspect` captures a fingerprinted manifest of the served
+  surface (capabilities + fully-paginated tools/resources/prompts; volatile wire fields and
+  timestamps stay outside the hash, so identical surface ⇒ identical `contract_sha256`).
+  `mcp-proof diff` classifies changes as BREAKING / ADDITIVE / METADATA — removed items,
+  optional→required flips, type/enum/constraint tightening, removed output fields, and
+  weakened safety annotations (`readOnlyHint`/`destructiveHint`) are breaking — and exits
+  non-zero on breaking changes (`--fail-on breaking|any|never`).
+- **Annotations-first call planning**: `classify_tool` lets MCP annotations outrank the
+  name heuristic in both directions; `mcp-proof plan` prints the AUTO-CALL / SKIPPED plan
+  with the basis for each decision. Recording, TOOL-06's dynamic call and the plan all
+  share one policy.
+- Tool listings are now fully paginated in the recorder, replayer and plan (previously
+  first-page only).
+- New test servers: a fastmcp legacy server exposing all three surfaces, and the modern
+  target grew resources, prompts, annotations and a `--drop-tool` contract-drift knob.
+
+
 ## 0.3.0 — 2026-08-21
 
 Dual-era protocol support: the conformance lane now speaks both the 2026-07-28 modern era and

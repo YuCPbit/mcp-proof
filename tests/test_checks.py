@@ -19,10 +19,13 @@ async def test_good_server_conformance(good_server_cmd):
     results = (await run_conformance(good_server_cmd)).results
     by_id = {r.id: r for r in results}
 
-    must_not_pass = [
-        (r.id, r.status, r.evidence) for r in results if r.level == MUST and r.status != PASS
+    # SKIP is legitimate for surfaces the server does not offer (RES-03 on a
+    # tools-only server); a MUST may never FAIL or WARN here
+    must_bad = [
+        (r.id, r.status, r.evidence)
+        for r in results if r.level == MUST and r.status not in (PASS, "SKIP")
     ]
-    assert not must_not_pass, must_not_pass
+    assert not must_bad, must_bad
     # fastmcp negotiates 2025-11-25, the newest revision initialize can carry
     assert by_id["LIFE-02"].status == PASS, by_id["LIFE-02"].evidence
     assert by_id["HYG-01"].status == PASS

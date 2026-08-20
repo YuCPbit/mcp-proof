@@ -27,6 +27,7 @@ def _shim_tool(t: dict) -> SimpleNamespace:
         name=t.get("name"),
         description=t.get("description"),
         inputSchema=t.get("inputSchema"),
+        annotations=t.get("annotations"),
     )
 
 

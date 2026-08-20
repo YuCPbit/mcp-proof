@@ -17,6 +17,7 @@ Planted-violation flags for negative tests:
   --omit-cache        tools/list drops ttlMs/cacheScope   (CACHE-01)
   --omit-result-type  results drop resultType             (RTYPE-01)
   --price-total N     price returns N instead of 42.00     (VALUE drift)
+  --drop-tool NAME    remove a tool from tools/list        (contract diff)
 """
 
 import json
@@ -36,6 +37,9 @@ OMIT_RESULT_TYPE = "--omit-result-type" in sys.argv
 PRICE_TOTAL = (
     float(sys.argv[sys.argv.index("--price-total") + 1])
     if "--price-total" in sys.argv else 42.0
+)
+DROP_TOOL = (
+    sys.argv[sys.argv.index("--drop-tool") + 1] if "--drop-tool" in sys.argv else None
 )
 
 TOOLS = [
@@ -61,8 +65,36 @@ TOOLS = [
             "properties": {"total": {"type": "number"}, "currency": {"type": "string"}},
             "required": ["total", "currency"],
         },
+        "annotations": {"readOnlyHint": True},
     },
 ]
+
+RESOURCES = [
+    {
+        "uri": "demo://readme",
+        "name": "readme",
+        "description": "A static text resource.",
+        "mimeType": "text/plain",
+    },
+]
+
+PROMPTS = [
+    {
+        "name": "summarize",
+        "description": "Summarize a topic.",
+        "arguments": [
+            {"name": "topic", "description": "What to summarize.", "required": True},
+        ],
+    },
+]
+
+
+def _cacheable(payload: dict) -> dict:
+    """List/read results carry ttlMs + cacheScope (CacheableResult, SEP-2549)."""
+    if not OMIT_CACHE:
+        payload["ttlMs"] = 60000
+        payload["cacheScope"] = "private"
+    return payload
 
 
 def _result(payload: dict) -> dict:
@@ -136,13 +168,36 @@ def handle(method: str, params, headers=None) -> tuple[str, dict]:
         return "error", err
 
     if method == "server/discover":
-        return "result", _result({"supportedVersions": SUPPORTED, "capabilities": {"tools": {}}})
+        return "result", _result({
+            "supportedVersions": SUPPORTED,
+            "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
+        })
     if method == "tools/list":
-        payload: dict = {"tools": TOOLS}
-        if not OMIT_CACHE:
-            payload["ttlMs"] = 60000
-            payload["cacheScope"] = "private"
-        return "result", _result(payload)
+        tools = [t for t in TOOLS if t["name"] != DROP_TOOL]
+        return "result", _result(_cacheable({"tools": tools}))
+    if method == "resources/list":
+        return "result", _result(_cacheable({"resources": RESOURCES}))
+    if method == "resources/read":
+        uri = (params or {}).get("uri")
+        if uri != "demo://readme":
+            return "error", _error(-32602, f"unknown resource: {uri!r}")
+        return "result", _result(_cacheable({
+            "contents": [{"uri": uri, "mimeType": "text/plain", "text": "hello resource"}],
+        }))
+    if method == "prompts/list":
+        return "result", _result(_cacheable({"prompts": PROMPTS}))
+    if method == "prompts/get":
+        name = (params or {}).get("name")
+        args = (params or {}).get("arguments") or {}
+        if name != "summarize":
+            return "error", _error(-32602, f"unknown prompt: {name!r}")
+        if not isinstance(args.get("topic"), str):
+            return "error", _error(-32602, "summarize requires arguments.topic (string)")
+        return "result", _result({
+            "messages": [
+                {"role": "user", "content": {"type": "text", "text": f"Summarize {args['topic']}"}}
+            ],
+        })
     if method == "tools/call":
         name = (params or {}).get("name")
         args = (params or {}).get("arguments") or {}

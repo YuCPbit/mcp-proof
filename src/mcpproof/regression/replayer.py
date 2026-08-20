@@ -49,14 +49,13 @@ async def replay(
     cmd: list[str] | None, fixtures_dir: str | Path, url: str | None = None,
     era: str = "auto",
 ) -> list[DriftResult]:
-    from .recorder import _session_ctx
+    from .recorder import _session_ctx, list_all_tools
 
     fixtures_dir = Path(fixtures_dir)
     paths = _replay_order(fixtures_dir)
     results: list[DriftResult] = []
     async with await _session_ctx(cmd, url, era) as session:
-        listing = await session.list_tools()
-        available = {t.name for t in listing.tools}
+        available = {t.name for t in await list_all_tools(session)}
         for path in paths:
             try:
                 fixture = json.loads(path.read_text(encoding="utf-8"))

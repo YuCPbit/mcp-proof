@@ -143,6 +143,76 @@ async def _cmd_run(args) -> int:
     return 0 if gate_ok else 1
 
 
+async def _cmd_inspect(args) -> int:
+    from .contract import capture_manifest
+
+    manifest = await capture_manifest(
+        args.server_cmd or None, url=getattr(args, "url", None),
+        era=getattr(args, "era", "auto"),
+    )
+    out = Path(args.out)
+    out.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    srv = manifest["server"]
+    print(f"✓ contract manifest written: {out}")
+    print(f"  {srv.get('name')} · {srv.get('era')} era · revision {srv.get('revision')}")
+    print(f"  tools {len(manifest['tools'])} · resources {len(manifest['resources'])}"
+          f" · prompts {len(manifest['prompts'])}")
+    print(f"  contract sha256 {manifest['contract_sha256'][:16]}…")
+    return 0
+
+
+async def _cmd_diff(args) -> int:
+    from .contract import diff_manifests, has_breaking
+
+    base = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
+    current = json.loads(Path(args.current).read_text(encoding="utf-8"))
+    changes = diff_manifests(base, current)
+    if not changes:
+        print("contract unchanged"
+              f" (sha256 {current.get('contract_sha256', '')[:16]}…)")
+        return 0
+    for level in ("BREAKING", "ADDITIVE", "METADATA"):
+        rows = [c for c in changes if c["level"] == level]
+        if not rows:
+            continue
+        print(level)
+        marker = {"BREAKING": "-", "ADDITIVE": "+", "METADATA": "~"}[level]
+        for c in rows:
+            print(f"{marker} {c['ref']}: {c['detail']}")
+    fail_on = getattr(args, "fail_on", "breaking")
+    if fail_on == "never":
+        return 0
+    if fail_on == "any":
+        return 1
+    return 1 if has_breaking(changes) else 0
+
+
+async def _cmd_plan(args) -> int:
+    """Which tools would auto-baselining call, and on what basis."""
+    from .regression.recorder import _session_ctx, classify_tool, list_all_tools
+
+    cmd = args.server_cmd or None
+    url = getattr(args, "url", None)
+    async with await _session_ctx(cmd, url, getattr(args, "era", "auto")) as session:
+        tools = await list_all_tools(session)
+    rows = [
+        (t.name, *classify_tool(t.name, t.description, getattr(t, "annotations", None)))
+        for t in tools
+    ]
+    auto = [(n, r) for n, d, r in rows if d == "auto"]
+    skip = [(n, r) for n, d, r in rows if d == "skip"]
+    width = max((len(n) for n, _, _ in rows), default=0)
+    print(f"AUTO-CALL ({len(auto)})")
+    for n, r in sorted(auto, key=lambda x: (not x[1].startswith("annotation"), x[0])):
+        print(f"  ✓ {n:<{width}}  {r}")
+    print(f"SKIPPED ({len(skip)})")
+    for n, r in sorted(skip, key=lambda x: (not x[1].startswith("annotation"), x[0])):
+        print(f"  × {n:<{width}}  {r}")
+    print("\nrecord/run auto-call only the AUTO-CALL set; review this plan before "
+          "auditing production, and use --include-destructive to record the rest.")
+    return 0
+
+
 async def _cmd_record(args) -> int:
     from .regression.recorder import record
 
@@ -176,5 +246,8 @@ async def _cmd_replay(args) -> int:
 
 
 def dispatch(args) -> int:
-    handler = {"run": _cmd_run, "record": _cmd_record, "replay": _cmd_replay}[args.command]
+    handler = {
+        "run": _cmd_run, "record": _cmd_record, "replay": _cmd_replay,
+        "plan": _cmd_plan, "inspect": _cmd_inspect, "diff": _cmd_diff,
+    }[args.command]
     return asyncio.run(handler(args))

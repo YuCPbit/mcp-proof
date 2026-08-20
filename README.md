@@ -4,11 +4,11 @@
 
 ### Ship an MCP server with a receipt.
 
-**One command audits an MCP server over stdio or Streamable HTTP — and hands your client a fingerprinted, reproducible delivery report plus a CI regression suite they keep.**
+**One command audits any MCP server — tools, resources and prompts, either protocol era, stdio or Streamable HTTP — and hands your client a fingerprinted, reproducible delivery report plus a CI regression suite they keep.**
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
-[![checks](https://img.shields.io/badge/checks-19_modern_·_15_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
+[![checks](https://img.shields.io/badge/checks-28_modern_·_24_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
 [![transports](https://img.shields.io/badge/transports-stdio_·_HTTP-informational)](src/mcpproof/client_http.py)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
@@ -24,12 +24,13 @@
 
 ## ✨ What you get
 
-- 🔍 **Wire-level protocol checks for both protocol eras** — mcp-proof speaks raw JSON-RPC to your server and auto-detects its era: 19 checks for the 2026-07-28 modern era (`server/discover`, `_meta` envelope enforcement, `resultType`, `ttlMs`/`cacheScope`, `-32022` version rejection, HTTP routing-header enforcement) and 15 for the initialize-handshake era — exact error codes, tool-schema validity, structured output, stdout hygiene, pagination safety. Capability-aware: a resources- or prompts-only server is never failed for lacking tools.
+- 🔍 **Wire-level protocol checks across every surface and both eras** — mcp-proof speaks raw JSON-RPC to your server and auto-detects its era: 28 checks for the 2026-07-28 modern era (`server/discover`, `_meta` envelope enforcement, `resultType`, `ttlMs`/`cacheScope` on every cacheable result, `-32022` version rejection, HTTP routing-header enforcement) and 24 for the initialize-handshake era — exact error codes, schema validity, structured output, stdout hygiene, pagination safety, and dedicated resources & prompts lanes. Capability-aware in both directions: surfaces a server does not advertise are skipped, surfaces it does advertise must work.
 - 🛡️ **Security audit tied to a public standard** — 6 deterministic checks (tool-description poisoning, invisible/bidi characters, leaked credentials, unconstrained injection surfaces, advertised shell execution), each mapped to canonical control IDs of the 24-control [MCP Server Security Standard](https://mcp-security-standard.org), rendered as a full compliance table in every report.
 - 📼 **A regression suite your client keeps** — records in either protocol era; golden fixtures with SHA-256 provenance freeze the server's behaviour; replay grades every drift (`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`), understands structured output, preserves stateful call order, and ships with a ready-to-paste GitHub Actions gate.
 - 📄 **A report non-engineers can read** — verdict banner, score tiles, per-finding evidence and fixes, MSSS table, and a priority-ordered **Recommended next steps** list. Self-contained HTML; add `--pdf` for a PDF.
 - 🔁 **Reproducible by design** — zero LLM calls, zero API keys. Every hash is computed from behaviour alone — timestamps and latency live in a separate, unhashed observation layer — so identical server behaviour produces an identical report fingerprint and acceptance is verification, not trust.
-- 🧯 **Conservative auto-baselining** — mutating-looking tools (`write_*`, `delete_*`, `exec`, …) are skipped by default and listed in the manifest for review; opt in per run with `--include-destructive`. `--edge-cases` additionally baselines oversized, empty, and injection-shaped inputs.
+- 🧯 **Annotations-first call planning** — MCP tool annotations outrank the name heuristic in both directions: `readOnlyHint` rescues read-only tools the regex would over-block, `destructiveHint` catches mutators it would miss; unannotated tools fall back to the conservative heuristic. `mcp-proof plan` shows exactly what auto-baselining would call and on what basis, before anything touches production; `--include-destructive` and `--edge-cases` opt into more.
+- 📋 **A contract diff for CI** — `mcp-proof inspect` freezes the served surface (capabilities + tools + resources + prompts, fully paginated) into a fingerprinted manifest; `mcp-proof diff` classifies every change as `BREAKING` / `ADDITIVE` / `METADATA` and exits non-zero on breaking ones — schema tightening, enum narrowing, required-flips, removed output fields and weakened safety annotations all count.
 
 ## 🚀 Quick start
 
@@ -43,8 +44,11 @@ Auditing a running HTTP server instead? `mcp-proof run --url http://localhost:80
 Exit code `0` means: every MUST check passed, zero security findings, zero behavioural drift — a one-line CI gate.
 
 ```bash
+mcp-proof plan python my_server.py                            # what would auto-baselining call, and why
 mcp-proof record python my_server.py --fixtures fixtures/    # freeze the behavioural contract
 mcp-proof replay --fixtures fixtures/ -- python my_server.py  # fail on any drift
+mcp-proof inspect python my_server.py --out baseline.json     # freeze the contract surface
+mcp-proof diff baseline.json current.json                     # BREAKING / ADDITIVE / METADATA, exit 1 on breaking
 ```
 
 See the difference in 60 seconds with the built-in demo pair — a clean server and one with nine planted violations:
@@ -66,7 +70,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 | Lane | What it proves | How |
 |---|---|---|
-| **Protocol conformance** | The server implements MCP correctly on the wire — handshake, JSON-RPC error semantics, tool & output schemas, capability consistency, pagination, stdout hygiene | A hand-rolled JSON-RPC probe observes the raw byte stream, so nothing is smoothed over |
+| **Protocol conformance** | The server implements MCP correctly on the wire — era negotiation, JSON-RPC error semantics, tool/resource/prompt surfaces, output schemas, capability consistency, pagination, stdout hygiene | A hand-rolled JSON-RPC probe observes the raw byte stream, so nothing is smoothed over |
 | **Security & hygiene** | Tool metadata is clean: no injected instructions, hidden Unicode, leaked secrets, or unconstrained execution surfaces | Deterministic static analysis, every finding carrying its MSSS control ID |
 | **Behaviour regression** | The server still does exactly what it did at delivery | Record/replay of provenance-fingerprinted golden fixtures, drift graded by severity |
 
@@ -77,6 +81,7 @@ Every lane feeds one report — and the report ends with a prioritized fix list,
 | | |
 |---|---|
 | Transports | stdio ✅ · Streamable HTTP ✅ |
+| Surfaces | tools ✅ · resources ✅ · prompts ✅ — capability-aware in both directions |
 | Modern era `2026-07-28` (`server/discover`, stateless `_meta`) | ✅ conformance lane, auto-detected — `--era auto\|modern\|legacy` |
 | Legacy era (initialize handshake, `2024-11-05` → `2025-11-25`) | ✅ all lanes |
 | Regression lane | ✅ both eras — SDK session (legacy) · probe-backed session (modern) |
@@ -105,7 +110,7 @@ Building a server rather than auditing one? [`templates/server-starter/`](templa
 | Release | Focus |
 |---|---|
 | v0.3 | ✅ Dual-era protocol support, shipped on main — era auto-detection, 19 modern-era checks, dual-era regression sessions, validated against the official v2 SDK on both transports |
-| v0.4 | Capability-aware resources & prompts lanes · contract manifest `inspect` / `diff` / `assert-no-breaking` |
+| v0.4 | ✅ Capability-aware resources & prompts lanes · contract manifest `inspect` / `diff` with a breaking-change gate · annotations-first call plan |
 | v0.5 | JSON / JUnit / SARIF outputs · reusable GitHub Action |
 | v0.6 | Schema-driven boundary & negative test generation |
 | Later | Opt-in semantic lane (LLM-graded assertions) — parked until the deterministic core is complete |

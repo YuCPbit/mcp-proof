@@ -4,11 +4,11 @@
 
 ### 交付 MCP 服务器，附带一张「收据」。
 
-**一条命令审计 stdio 或 Streamable HTTP 上的 MCP 服务器——交给客户一份带指纹、可复现的交付报告，外加一套留在客户仓库里持续把关的 CI 回归套件。**
+**一条命令审计任意 MCP 服务器——tools、resources、prompts 三个面，两个协议时代，stdio 或 Streamable HTTP——交给客户一份带指纹、可复现的交付报告，外加一套留在客户仓库里持续把关的 CI 回归套件。**
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
-[![checks](https://img.shields.io/badge/checks-19_modern_·_15_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
+[![checks](https://img.shields.io/badge/checks-28_modern_·_24_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
 [![transports](https://img.shields.io/badge/transports-stdio_·_HTTP-informational)](src/mcpproof/client_http.py)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
@@ -24,12 +24,13 @@
 
 ## ✨ 你得到什么
 
-- 🔍 **覆盖两个协议时代的线级检查** —— mcp-proof 直接对服务器说原始 JSON-RPC 并自动识别其时代：2026-07-28 现代时代 19 项（`server/discover`、`_meta` envelope 强制、`resultType`、`ttlMs`/`cacheScope`、-32022 版本拒绝、HTTP 路由 header 强制），initialize 握手时代 15 项——精确错误码、工具 schema、结构化输出、stdout 卫生、分页安全。能力感知：只提供 resources 或 prompts 的服务器绝不会因为没有 tools 而被判失败。
+- 🔍 **覆盖全部面与两个时代的线级检查** —— mcp-proof 直接对服务器说原始 JSON-RPC 并自动识别其时代：2026-07-28 现代时代 28 项（`server/discover`、`_meta` envelope 强制、`resultType`、所有可缓存结果的 `ttlMs`/`cacheScope`、-32022 版本拒绝、HTTP 路由 header 强制），initialize 握手时代 24 项——精确错误码、schema 合法性、结构化输出、stdout 卫生、分页安全，以及专门的 resources 与 prompts 车道。双向能力感知：未声明的面跳过，声明了的面必须能用。
 - 🛡️ **挂靠公开标准的安全审计** —— 6 项确定性检查（工具描述投毒、隐形/双向字符、凭据泄漏、无约束注入面、暴露任意执行），每项映射到 24 控制项的 [MCP Server Security Standard](https://mcp-security-standard.org) 的规范控制 ID，每份报告内置完整合规表。
 - 📼 **留给客户的回归套件** —— 两个协议时代都能录制；带 SHA-256 溯源的黄金 fixtures 冻结服务器行为；重放按严重度给漂移分级（`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`），理解结构化输出，保持有状态调用顺序，并附带可直接粘贴的 GitHub Actions 门禁。
 - 📄 **非工程师也能读的报告** —— 判定横幅、分数卡、逐项证据与修复建议、MSSS 合规表，以及按优先级排序的**下一步行动清单**。自包含 HTML；加 `--pdf` 直接出 PDF。
 - 🔁 **可复现是设计出来的** —— 零 LLM 调用、零 API key。所有哈希只依赖行为本身——时间戳与延迟放在独立、不进哈希的 observation 层——因此相同的服务器行为产生相同的报告指纹：验收靠验证，不靠信任。
-- 🧯 **保守的自动基线** —— 疑似写型工具（`write_*`、`delete_*`、`exec` 等）默认跳过并列入 manifest 供人工复核；需要时用 `--include-destructive` 显式放行。`--edge-cases` 额外把超长、空串、注入形态的输入也纳入基线。
+- 🧯 **annotations 优先的调用规划** —— MCP 工具注解双向覆盖名称启发式：`readOnlyHint` 救回会被正则误拦的只读工具，`destructiveHint` 抓住正则漏掉的写型工具；无注解才回退保守启发式。`mcp-proof plan` 在碰生产环境之前就告诉你自动基线会调用什么、依据是什么；`--include-destructive` 与 `--edge-cases` 按需放行更多。
+- 📋 **给 CI 的契约 diff** —— `mcp-proof inspect` 把服务面（capabilities + tools + resources + prompts，翻页收齐）冻结成带指纹的 manifest；`mcp-proof diff` 把每处变化归为 `BREAKING` / `ADDITIVE` / `METADATA`，出现破坏性变化即非零退出——schema 收紧、enum 收窄、optional 变 required、输出字段消失、安全注解弱化都算数。
 
 ## 🚀 快速开始
 
@@ -77,6 +78,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | | |
 |---|---|
 | 传输层 | stdio ✅ · Streamable HTTP ✅ |
+| 服务面 | tools ✅ · resources ✅ · prompts ✅ ——双向能力感知 |
 | 现代时代 `2026-07-28`（`server/discover`、无状态 `_meta`） | ✅ 一致性车道，自动识别——`--era auto\|modern\|legacy` |
 | Legacy 时代（initialize 握手，`2024-11-05` → `2025-11-25`） | ✅ 全部车道 |
 | 回归车道 | ✅ 双时代——SDK 会话（legacy）· 探针会话（modern） |
@@ -102,7 +104,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | 版本 | 主线 |
 |---|---|
 | v0.3 | ✅ 双时代协议支持已落地 main——时代自动识别、19 项现代检查、双时代回归会话，对官方 v2 SDK 双传输实测全绿 |
-| v0.4 | 能力感知的 resources / prompts 车道 · 契约清单 `inspect` / `diff` / `assert-no-breaking` |
+| v0.4 | ✅ 能力感知的 resources / prompts 车道 · 契约清单 `inspect` / `diff` 破坏性变化门禁 · annotations 优先调用规划 |
 | v0.5 | JSON / JUnit / SARIF 输出 · 可复用的 GitHub Action |
 | v0.6 | Schema 驱动的边界与负向测试生成 |
 | 更远 | 可选语义车道（LLM 评分断言）——等确定性核心完工后再排期 |
