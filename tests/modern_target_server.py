@@ -18,6 +18,7 @@ Planted-violation flags for negative tests:
   --omit-result-type  results drop resultType             (RTYPE-01)
   --price-total N     price returns N instead of 42.00     (VALUE drift)
   --drop-tool NAME    remove a tool from tools/list        (contract diff)
+  --loose-validation  accept args violating the schema      (TOOL-07)
 """
 
 import json
@@ -41,6 +42,7 @@ PRICE_TOTAL = (
 DROP_TOOL = (
     sys.argv[sys.argv.index("--drop-tool") + 1] if "--drop-tool" in sys.argv else None
 )
+VALIDATE = "--loose-validation" not in sys.argv
 
 TOOLS = [
     {
@@ -110,6 +112,21 @@ def _error(code: int, message: str, data=None) -> dict:
     if data is not None:
         err["data"] = data
     return err
+
+
+def _check_str(args: dict, key: str, max_len: int):
+    """Enforce the declared schema; --loose-validation plants the TOOL-07 gap
+    (missing keys still error, so MUST-level checks stay green)."""
+    if key not in args:
+        return _error(-32602, f"missing required argument: {key}")
+    if not VALIDATE:
+        return None
+    value = args[key]
+    if not isinstance(value, str):
+        return _error(-32602, f"{key} must be a string")
+    if len(value) > max_len:
+        return _error(-32602, f"{key} exceeds maxLength {max_len}")
+    return None
 
 
 def _rung1_envelope(params) -> tuple[dict | None, dict | None]:
@@ -204,14 +221,16 @@ def handle(method: str, params, headers=None) -> tuple[str, dict]:
         if not isinstance(name, str):
             return "error", _error(-32602, "tools/call requires params.name")
         if name == "echo":
-            if not isinstance(args.get("text"), str):
-                return "error", _error(-32602, "echo requires arguments.text (string)")
+            err = _check_str(args, "text", 200)
+            if err:
+                return "error", err
             return "result", _result(
-                {"content": [{"type": "text", "text": args["text"]}], "isError": False}
+                {"content": [{"type": "text", "text": str(args["text"])}], "isError": False}
             )
         if name == "price":
-            if not isinstance(args.get("item"), str):
-                return "error", _error(-32602, "price requires arguments.item (string)")
+            err = _check_str(args, "item", 100)
+            if err:
+                return "error", err
             return "result", _result({
                 "content": [{"type": "text", "text": f"Total: ${PRICE_TOTAL:.2f}"}],
                 "structuredContent": {"total": PRICE_TOTAL, "currency": "USD"},

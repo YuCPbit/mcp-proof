@@ -167,6 +167,12 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
         MUST,
         "Ship a structuredContent that validates against the declared outputSchema.",
     ),
+    "TOOL-07": (
+        "declared input constraints are enforced",
+        SHOULD,
+        "Validate tool arguments against the declared inputSchema; inputs that "
+        "violate it must be rejected, not answered normally.",
+    ),
     "RES-01": (
         "advertised resources capability serves resources/list",
         MUST,
@@ -207,7 +213,7 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
 
 _SHARED_IDS = (
     "RPC-01", "RPC-02", "RPC-03",
-    "TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05", "TOOL-06",
+    "TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05", "TOOL-06", "TOOL-07",
     "LIST-01", "HYG-01", "CAP-01",
     "RES-01", "RES-02", "RES-03", "RES-04",
     "PROMPT-01", "PROMPT-02", "PROMPT-03",
@@ -812,7 +818,8 @@ async def _tool_checks(
     if not tools_served:
         return [
             _res(cid, SKIP, skip_reason)
-            for cid in ("TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05", "TOOL-06")
+            for cid in ("TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05",
+                        "TOOL-06", "TOOL-07")
         ]
 
     results: list[CheckResult] = []
@@ -903,8 +910,51 @@ async def _tool_checks(
             ))
 
     results.append(await _output_schema_check(probe, tools))
+    results.append(await _schema_enforcement_check(probe, tools))
 
     return results
+
+
+async def _schema_enforcement_check(probe, tools: list) -> CheckResult:
+    """TOOL-07: send verified schema-violating inputs to side-effect-safe
+    tools; a normal answer means the declared constraints are decoration."""
+    from ..regression.negative import negative_variants
+    from ..regression.recorder import classify_tool
+
+    candidates = [
+        t for t in tools
+        if isinstance(t, dict) and t.get("name") and isinstance(t.get("inputSchema"), dict)
+        and classify_tool(t["name"], t.get("description"), t.get("annotations"))[0] == "auto"
+    ][:3]
+    attempted = 0
+    offenders: list[str] = []
+    for t in candidates:
+        for case, args in negative_variants(t["inputSchema"], limit=2):
+            attempted += 1
+            resp = await _safe(probe.request(
+                "tools/call", {"name": t["name"], "arguments": args}
+            ))
+            result_obj = resp.get("result") if isinstance(resp, dict) else None
+            rejected = (
+                resp is None
+                or "error" in resp
+                or (isinstance(result_obj, dict) and result_obj.get("isError"))
+            )
+            if not rejected:
+                offenders.append(
+                    f"{t['name']}: minimal invalid input ({case}) was answered normally"
+                )
+    if not attempted:
+        return _res("TOOL-07", SKIP, "no safe tool offers a verifiable schema-violating variant")
+    if offenders:
+        return _res(
+            "TOOL-07", WARN,
+            "declared constraints not enforced — " + "; ".join(offenders[:4]),
+        )
+    return _res(
+        "TOOL-07", PASS,
+        f"{attempted} schema-violating input(s) across {len(candidates)} tool(s), all rejected",
+    )
 
 
 async def _output_schema_check(probe, tools: list) -> CheckResult:

@@ -8,7 +8,7 @@
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
-[![checks](https://img.shields.io/badge/checks-28_modern_·_24_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
+[![checks](https://img.shields.io/badge/checks-30_modern_·_25_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
 [![transports](https://img.shields.io/badge/transports-stdio_·_HTTP-informational)](src/mcpproof/client_http.py)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
@@ -24,7 +24,7 @@
 
 ## ✨ What you get
 
-- 🔍 **Wire-level protocol checks across every surface and both eras** — mcp-proof speaks raw JSON-RPC to your server and auto-detects its era: 28 checks for the 2026-07-28 modern era (`server/discover`, `_meta` envelope enforcement, `resultType`, `ttlMs`/`cacheScope` on every cacheable result, `-32022` version rejection, HTTP routing-header enforcement) and 24 for the initialize-handshake era — exact error codes, schema validity, structured output, stdout hygiene, pagination safety, and dedicated resources & prompts lanes. Capability-aware in both directions: surfaces a server does not advertise are skipped, surfaces it does advertise must work.
+- 🔍 **Wire-level protocol checks across every surface and both eras** — mcp-proof speaks raw JSON-RPC to your server and auto-detects its era: 30 checks for the 2026-07-28 modern era (`server/discover`, `_meta` envelope enforcement, `resultType`, `ttlMs`/`cacheScope` on every cacheable result, `-32022` version rejection, HTTP routing-header enforcement) and 25 for the initialize-handshake era — exact error codes, schema validity, structured output, stdout hygiene, pagination safety, dedicated resources & prompts lanes, and **verified negative probes**: TOOL-07 sends inputs that provably violate the declared inputSchema and warns when the server answers them normally, quoting the minimal reproducer. Capability-aware in both directions: surfaces a server does not advertise are skipped, surfaces it does advertise must work.
 - 🛡️ **Security audit tied to a public standard** — 6 deterministic checks (tool-description poisoning, invisible/bidi characters, leaked credentials, unconstrained injection surfaces, advertised shell execution), each mapped to canonical control IDs of the 24-control [MCP Server Security Standard](https://mcp-security-standard.org), rendered as a full compliance table in every report.
 - 📼 **A regression suite your client keeps** — records in either protocol era; golden fixtures with SHA-256 provenance freeze the server's behaviour; replay grades every drift (`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`), understands structured output, preserves stateful call order, and ships with a ready-to-paste GitHub Actions gate.
 - 📄 **A report for humans *and* machines** — self-contained HTML with sticky navigation, per-check anchors (`report.html#SEC-03`), attention/passed filters and a collapsible MSSS matrix; `--pdf` for print. The same versioned model ships as `--json` (schema v1), `--junit` for any CI, and `--sarif` for the GitHub Security tab.
@@ -125,7 +125,7 @@ Building a server rather than auditing one? [`templates/server-starter/`](templa
 | v0.3 | ✅ Dual-era protocol support, shipped on main — era auto-detection, 19 modern-era checks, dual-era regression sessions, validated against the official v2 SDK on both transports |
 | v0.4 | ✅ Capability-aware resources & prompts lanes · contract manifest `inspect` / `diff` with a breaking-change gate · annotations-first call plan |
 | v0.5 | ✅ Versioned JSON report model · JUnit & SARIF outputs · reusable GitHub Action (`uses: YuCPbit/mcp-proof@v0.5.0`) · report UI: sticky nav, anchors, filters |
-| v0.6 | Schema-driven boundary & negative test generation |
+| v0.6 | ✅ Two-phase argument synthesis (`$ref` / `allOf` / `const` / `pattern` / `format` / bounds / `multipleOf`) · verified schema-violating negative probes (TOOL-07) with minimal reproducers |
 | Later | Opt-in semantic lane (LLM-graded assertions) — parked until the deterministic core is complete |
 
 ## 🔍 Limitations

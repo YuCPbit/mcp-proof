@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.0 — 2026-08-21
+
+The sampler grows up, and the audit learns to ask the question schemas only imply:
+does the server actually enforce what it declares?
+
+- **Two-phase argument synthesis**: local `$ref` resolution, `allOf` merging (properties
+  union, required union, first-wins otherwise), `const`, `pattern` (deterministic candidate
+  matching), `format` seeds (date-time/email/uri/uuid/…), `exclusiveMinimum`/`Maximum`,
+  `multipleOf` snapping, `minItems`/`maxItems`. Same schema, same args, every run.
+- **Verified negative variants** (`regression/negative.py`): the valid baseline with exactly
+  one field pushed past a declared constraint — oversized strings, out-of-range numbers,
+  enum outsiders, pattern misses, type flips (booleans get an int, because lax validators
+  coerce "yes"-style strings). Every candidate is checked against the schema with
+  `jsonschema` before use: if it doesn't provably violate the declaration, it is discarded.
+- **TOOL-07 (SHOULD, both eras)**: sends up to two verified-invalid inputs to up to three
+  side-effect-safe tools (same annotations-first policy as recording). A server that answers
+  them normally gets a WARN quoting the minimal reproducer. Strictly-validating servers PASS;
+  the modern test target grew a `--loose-validation` flag to plant the gap.
+
+
 ## 0.5.0 — 2026-08-21
 
 One report model, every output format a CI could want.

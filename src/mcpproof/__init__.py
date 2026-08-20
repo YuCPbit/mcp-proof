@@ -1,4 +1,4 @@
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 # Newest published MCP revision (modern era: server/discover, stateless _meta).
 LATEST_SPEC = "2026-07-28"

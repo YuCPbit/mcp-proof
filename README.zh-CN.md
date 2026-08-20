@@ -8,7 +8,7 @@
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
-[![checks](https://img.shields.io/badge/checks-28_modern_·_24_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
+[![checks](https://img.shields.io/badge/checks-30_modern_·_25_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
 [![transports](https://img.shields.io/badge/transports-stdio_·_HTTP-informational)](src/mcpproof/client_http.py)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
@@ -24,7 +24,7 @@
 
 ## ✨ 你得到什么
 
-- 🔍 **覆盖全部面与两个时代的线级检查** —— mcp-proof 直接对服务器说原始 JSON-RPC 并自动识别其时代：2026-07-28 现代时代 28 项（`server/discover`、`_meta` envelope 强制、`resultType`、所有可缓存结果的 `ttlMs`/`cacheScope`、-32022 版本拒绝、HTTP 路由 header 强制），initialize 握手时代 24 项——精确错误码、schema 合法性、结构化输出、stdout 卫生、分页安全，以及专门的 resources 与 prompts 车道。双向能力感知：未声明的面跳过，声明了的面必须能用。
+- 🔍 **覆盖全部面与两个时代的线级检查** —— mcp-proof 直接对服务器说原始 JSON-RPC 并自动识别其时代：2026-07-28 现代时代 30 项（`server/discover`、`_meta` envelope 强制、`resultType`、所有可缓存结果的 `ttlMs`/`cacheScope`、-32022 版本拒绝、HTTP 路由 header 强制），initialize 握手时代 25 项——精确错误码、schema 合法性、结构化输出、stdout 卫生、分页安全、专门的 resources 与 prompts 车道，以及**验证过的负向探测**：TOOL-07 发送可证明违反 inputSchema 的输入，服务器若正常应答即告警并附最小复现输入。双向能力感知：未声明的面跳过，声明了的面必须能用。
 - 🛡️ **挂靠公开标准的安全审计** —— 6 项确定性检查（工具描述投毒、隐形/双向字符、凭据泄漏、无约束注入面、暴露任意执行），每项映射到 24 控制项的 [MCP Server Security Standard](https://mcp-security-standard.org) 的规范控制 ID，每份报告内置完整合规表。
 - 📼 **留给客户的回归套件** —— 两个协议时代都能录制；带 SHA-256 溯源的黄金 fixtures 冻结服务器行为；重放按严重度给漂移分级（`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`），理解结构化输出，保持有状态调用顺序，并附带可直接粘贴的 GitHub Actions 门禁。
 - 📄 **人和机器都能读的报告** —— 自包含 HTML：吸顶导航、逐检查锚点（`report.html#SEC-03`）、关注/通过过滤器、可折叠 MSSS 矩阵；`--pdf` 供打印。同一份版本化模型可输出 `--json`（schema v1）、`--junit`（任意 CI）、`--sarif`（GitHub Security 页签）。
@@ -117,7 +117,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | v0.3 | ✅ 双时代协议支持已落地 main——时代自动识别、19 项现代检查、双时代回归会话，对官方 v2 SDK 双传输实测全绿 |
 | v0.4 | ✅ 能力感知的 resources / prompts 车道 · 契约清单 `inspect` / `diff` 破坏性变化门禁 · annotations 优先调用规划 |
 | v0.5 | ✅ 版本化 JSON 报告模型 · JUnit 与 SARIF 输出 · 可复用 GitHub Action（`uses: YuCPbit/mcp-proof@v0.5.0`）· 报告 UI：吸顶导航、锚点、过滤器 |
-| v0.6 | Schema 驱动的边界与负向测试生成 |
+| v0.6 | ✅ 两阶段参数合成（`$ref` / `allOf` / `const` / `pattern` / `format` / 边界 / `multipleOf`）· 验证过的负向探测（TOOL-07）附最小复现输入 |
 | 更远 | 可选语义车道（LLM 评分断言）——等确定性核心完工后再排期 |
 
 ## 🔍 边界与承诺
