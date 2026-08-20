@@ -123,7 +123,15 @@ async def _cmd_run(args) -> int:
         security=sec,
         regression=regression,
         out_path=args.out,
+        json_path=getattr(args, "json", None),
+        junit_path=getattr(args, "junit", None),
+        sarif_path=getattr(args, "sarif", None),
     )
+    for label, path in (("JSON", getattr(args, "json", None)),
+                        ("JUnit", getattr(args, "junit", None)),
+                        ("SARIF", getattr(args, "sarif", None))):
+        if path:
+            print(f"✓ {label} written: {path}")
 
     if getattr(args, "pdf", False):
         pdf = _export_pdf(Path(args.out))

@@ -27,6 +27,9 @@ def main(argv: list[str] | None = None) -> int:
              "(2026-07-28) and falls back to the initialize handshake (default: auto)",
     )
     run_p.add_argument("--out", default="mcp-proof-report.html", help="Report output path")
+    run_p.add_argument("--json", default=None, help="Also write the versioned JSON report model here")
+    run_p.add_argument("--junit", default=None, help="Also write a JUnit XML summary here")
+    run_p.add_argument("--sarif", default=None, help="Also write a SARIF 2.1.0 log here")
     run_p.add_argument("--fixtures", default=None, help="Fixtures dir; enables regression lane")
     run_p.add_argument("--server-name", default=None, help="Display name for the report")
     run_p.add_argument(

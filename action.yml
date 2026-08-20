@@ -1,0 +1,46 @@
+name: mcp-proof
+description: >-
+  Audit an MCP server — protocol conformance (both eras), security hygiene and
+  behavioural regression — and fail the job unless it is ship-ready.
+branding:
+  icon: check-square
+  color: purple
+inputs:
+  server-command:
+    description: Command that starts the stdio server (mutually exclusive with url)
+    default: ""
+  url:
+    description: URL of a running Streamable HTTP server (mutually exclusive with server-command)
+    default: ""
+  fixtures:
+    description: Fixtures directory; enables the regression lane
+    default: ""
+  era:
+    description: "Protocol era: auto | modern | legacy"
+    default: auto
+  out-prefix:
+    description: Prefix for the report artifacts (.html/.json/.junit.xml/.sarif)
+    default: mcp-proof-report
+  python-version:
+    description: Python used to run the audit
+    default: "3.12"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install mcp-proof
+      shell: bash
+      run: pip install --quiet "${{ github.action_path }}"
+    - name: Audit
+      shell: bash
+      run: |
+        args=(--era "${{ inputs.era }}"
+              --out "${{ inputs.out-prefix }}.html"
+              --json "${{ inputs.out-prefix }}.json"
+              --junit "${{ inputs.out-prefix }}.junit.xml"
+              --sarif "${{ inputs.out-prefix }}.sarif")
+        if [ -n "${{ inputs.url }}" ]; then args+=(--url "${{ inputs.url }}"); fi
+        if [ -n "${{ inputs.fixtures }}" ]; then args+=(--fixtures "${{ inputs.fixtures }}"); fi
+        mcp-proof run "${args[@]}" -- ${{ inputs.server-command }}

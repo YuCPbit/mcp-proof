@@ -83,14 +83,44 @@
   footer { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--hairline);
            font-size: 12px; color: var(--ink-3); }
   footer .mono { font-family: var(--mono); word-break: break-all; }
+  .nav { position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between;
+         align-items: center; gap: 12px; padding: 9px 2px; margin: 0 0 12px;
+         background: var(--page); border-bottom: 1px solid var(--hairline); font-size: 13px; }
+  .nav a { color: var(--ink-2); text-decoration: none; margin-right: 14px; }
+  .nav a:hover { color: var(--ink); }
+  .nav button { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+                border: 1px solid var(--hairline); background: var(--card); color: var(--ink-2); cursor: pointer; }
+  .nav button.on { border-color: var(--ink-2); color: var(--ink); font-weight: 600; }
+  tr:target td { background: rgba(250,178,25,.12); }
+  body[data-filter="attention"] tr[data-status="PASS"],
+  body[data-filter="attention"] tr[data-status="SKIP"],
+  body[data-filter="attention"] tr[data-status="OK"] { display: none; }
+  body[data-filter="passed"] tr[data-status]:not([data-status="PASS"]):not([data-status="OK"]) { display: none; }
+  .msss-toggle { font: inherit; font-size: 12px; padding: 2px 10px; margin-left: 6px; border-radius: 999px;
+                 border: 1px solid var(--hairline); background: var(--card); color: var(--ink-2); cursor: pointer; }
+  .msss-body.collapsed { display: none; }
   @media print {
     body { background: #fff; } .wrap { padding: 0; max-width: none; }
     tr, .tile { break-inside: avoid; }
+    .nav, .msss-toggle { display: none; }
+    .msss-body { display: block !important; }
+    tr[data-status] { display: table-row !important; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
+
+  <nav class="nav">
+    <span>
+      <a href="#conformance">Conformance</a><a href="#security">Security</a><a href="#msss">MSSS</a>{% if regression %}<a href="#regression">Regression</a>{% endif %}<a href="#next-steps">Next steps</a>
+    </span>
+    <span>
+      <button data-filter="all" class="on">All</button>
+      <button data-filter="attention">Attention</button>
+      <button data-filter="passed">Passed</button>
+    </span>
+  </nav>
 
   <div class="brand"><span class="mark">mcp-proof</span><span class="doc">Delivery report</span></div>
   <h1>{{ server_name }}</h1>
@@ -139,12 +169,12 @@
     {%- else %}<span class="badge skip">– SKIP</span>{% endif -%}
   {%- endmacro %}
 
-  <h2>Protocol conformance</h2>
+  <h2 id="conformance">Protocol conformance</h2>
   <table>
     <thead><tr><th>Check</th><th>Level</th><th>Result</th><th>Details</th></tr></thead>
     <tbody>
     {% for r in conformance %}
-      <tr>
+      <tr id="{{ r.id }}" data-status="{{ r.status }}">
         <td class="id">{{ r.id }}</td>
         <td class="level">{{ r.level }}</td>
         <td>{{ status_badge(r.status) }}</td>
@@ -158,12 +188,12 @@
     </tbody>
   </table>
 
-  <h2>Security &amp; hygiene</h2>
+  <h2 id="security">Security &amp; hygiene</h2>
   <table>
     <thead><tr><th>Check</th><th>Domain</th><th>Result</th><th>Details</th></tr></thead>
     <tbody>
     {% for r in security %}
-      <tr>
+      <tr id="{{ r.id }}" data-status="{{ r.status }}">
         <td class="id">{{ r.id }}</td>
         <td class="level">{{ r.msss_ref or '—' }}</td>
         <td>{{ status_badge(r.status) }}</td>
@@ -177,17 +207,19 @@
     </tbody>
   </table>
 
-  <h2>MSSS compliance</h2>
+  <h2 id="msss">MSSS compliance</h2>
   <p class="msss-lead"><b>{{ msss.headline }}.</b>
      Mapped against {{ msss.standard }} ({{ msss.mapping }}): {{ msss.overall.auto_met + msss.overall.auto_gap }} of
      {{ msss.overall.total }} controls are auto-assessable from this audit's deterministic checks; the remaining
      {{ msss.overall.manual }} need deployment, code or process evidence and are marked manual review — never assessed
-     by this tool.</p>
+     by this tool.
+     <button class="msss-toggle" data-show="Show all {{ msss.overall.total }} controls" data-hide="Collapse">Show all {{ msss.overall.total }} controls</button></p>
+  <div class="msss-body collapsed">
   <table>
     <thead><tr><th>Control</th><th>Domain</th><th>Level</th><th>Result</th><th>Title</th></tr></thead>
     <tbody>
     {% for c in msss.controls %}
-      <tr>
+      <tr id="{{ c.id }}" data-status="{{ 'PASS' if c.status == 'met' else ('FAIL' if c.status == 'gap' else 'SKIP') }}">
         <td class="id">{{ c.id }}</td>
         <td class="level">{{ c.domain }}</td>
         <td class="level">{{ c.min_level }}</td>
@@ -207,14 +239,15 @@
     </tbody>
   </table>
   <p class="attrib">Control taxonomy from the MCP Server Security Standard (MSSS), CC BY-SA 4.0, mcp-security-standard.org.</p>
+  </div>
 
   {% if regression %}
-  <h2>Behaviour regression</h2>
+  <h2 id="regression">Behaviour regression</h2>
   <table>
     <thead><tr><th>Fixture</th><th>Tool</th><th>Verdict</th><th>Detail</th></tr></thead>
     <tbody>
     {% for d in regression.drifts %}
-      <tr>
+      <tr data-status="{{ 'PASS' if d.kind == 'OK' else d.kind }}">
         <td class="id">{{ d.fixture }}</td>
         <td>{{ d.tool }}</td>
         <td><span class="badge {{ d.kind | lower }}">{{ d.kind }}</span></td>
@@ -234,7 +267,7 @@
   </div>
   {% endif %}
 
-  <h2>Recommended next steps</h2>
+  <h2 id="next-steps">Recommended next steps</h2>
   <ol class="steps">
     {% for s in next_steps %}
     <li><span class="prio {{ s.p | lower }}">{{ s.p }}</span><span>{{ s.text }}</span></li>
@@ -251,5 +284,25 @@
   </footer>
 
 </div>
+<script>
+(function () {
+  document.body.dataset.filter = "all";
+  var buttons = document.querySelectorAll(".nav button");
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.body.dataset.filter = b.dataset.filter;
+      buttons.forEach(function (o) { o.classList.toggle("on", o === b); });
+    });
+  });
+  var body = document.querySelector(".msss-body");
+  var toggle = document.querySelector(".msss-toggle");
+  if (toggle && body) {
+    toggle.addEventListener("click", function () {
+      var hidden = body.classList.toggle("collapsed");
+      toggle.textContent = hidden ? toggle.dataset.show : toggle.dataset.hide;
+    });
+  }
+})();
+</script>
 </body>
 </html>

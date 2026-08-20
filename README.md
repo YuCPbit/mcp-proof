@@ -27,7 +27,7 @@
 - 🔍 **Wire-level protocol checks across every surface and both eras** — mcp-proof speaks raw JSON-RPC to your server and auto-detects its era: 28 checks for the 2026-07-28 modern era (`server/discover`, `_meta` envelope enforcement, `resultType`, `ttlMs`/`cacheScope` on every cacheable result, `-32022` version rejection, HTTP routing-header enforcement) and 24 for the initialize-handshake era — exact error codes, schema validity, structured output, stdout hygiene, pagination safety, and dedicated resources & prompts lanes. Capability-aware in both directions: surfaces a server does not advertise are skipped, surfaces it does advertise must work.
 - 🛡️ **Security audit tied to a public standard** — 6 deterministic checks (tool-description poisoning, invisible/bidi characters, leaked credentials, unconstrained injection surfaces, advertised shell execution), each mapped to canonical control IDs of the 24-control [MCP Server Security Standard](https://mcp-security-standard.org), rendered as a full compliance table in every report.
 - 📼 **A regression suite your client keeps** — records in either protocol era; golden fixtures with SHA-256 provenance freeze the server's behaviour; replay grades every drift (`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`), understands structured output, preserves stateful call order, and ships with a ready-to-paste GitHub Actions gate.
-- 📄 **A report non-engineers can read** — verdict banner, score tiles, per-finding evidence and fixes, MSSS table, and a priority-ordered **Recommended next steps** list. Self-contained HTML; add `--pdf` for a PDF.
+- 📄 **A report for humans *and* machines** — self-contained HTML with sticky navigation, per-check anchors (`report.html#SEC-03`), attention/passed filters and a collapsible MSSS matrix; `--pdf` for print. The same versioned model ships as `--json` (schema v1), `--junit` for any CI, and `--sarif` for the GitHub Security tab.
 - 🔁 **Reproducible by design** — zero LLM calls, zero API keys. Every hash is computed from behaviour alone — timestamps and latency live in a separate, unhashed observation layer — so identical server behaviour produces an identical report fingerprint and acceptance is verification, not trust.
 - 🧯 **Annotations-first call planning** — MCP tool annotations outrank the name heuristic in both directions: `readOnlyHint` rescues read-only tools the regex would over-block, `destructiveHint` catches mutators it would miss; unannotated tools fall back to the conservative heuristic. `mcp-proof plan` shows exactly what auto-baselining would call and on what basis, before anything touches production; `--include-destructive` and `--edge-cases` opt into more.
 - 📋 **A contract diff for CI** — `mcp-proof inspect` freezes the served surface (capabilities + tools + resources + prompts, fully paginated) into a fingerprinted manifest; `mcp-proof diff` classifies every change as `BREAKING` / `ADDITIVE` / `METADATA` and exits non-zero on breaking ones — schema tightening, enum narrowing, required-flips, removed output fields and weakened safety annotations all count.
@@ -93,6 +93,19 @@ Streamable HTTP with SSE responses (`scripts/crosscheck_modern_server.py`).
 
 Works with servers in **any language** — mcp-proof talks to the process (or URL), not to your codebase.
 
+## ⚙️ CI in one step
+
+```yaml
+- uses: YuCPbit/mcp-proof@v0.5.0
+  with:
+    server-command: python my_server.py
+    fixtures: fixtures/
+```
+
+The job fails unless the server is ship-ready, and leaves `mcp-proof-report.html` / `.json` /
+`.junit.xml` / `.sarif` behind for upload. Prefer raw commands? `mcp-proof run … --junit r.xml --sarif r.sarif`
+plus `mcp-proof diff` is the same gate.
+
 ## 🏗️ Build on the audit-clean template
 
 Building a server rather than auditing one? [`templates/server-starter/`](templates/server-starter/) is a fastmcp server that passes this audit out of the box — constrained input schemas, proper error semantics, structured output, every practice annotated with the check ID it satisfies. Copy, implement your tools, audit, ship with the report.
@@ -111,7 +124,7 @@ Building a server rather than auditing one? [`templates/server-starter/`](templa
 |---|---|
 | v0.3 | ✅ Dual-era protocol support, shipped on main — era auto-detection, 19 modern-era checks, dual-era regression sessions, validated against the official v2 SDK on both transports |
 | v0.4 | ✅ Capability-aware resources & prompts lanes · contract manifest `inspect` / `diff` with a breaking-change gate · annotations-first call plan |
-| v0.5 | JSON / JUnit / SARIF outputs · reusable GitHub Action |
+| v0.5 | ✅ Versioned JSON report model · JUnit & SARIF outputs · reusable GitHub Action (`uses: YuCPbit/mcp-proof@v0.5.0`) · report UI: sticky nav, anchors, filters |
 | v0.6 | Schema-driven boundary & negative test generation |
 | Later | Opt-in semantic lane (LLM-graded assertions) — parked until the deterministic core is complete |
 

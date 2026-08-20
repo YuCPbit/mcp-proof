@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.0 — 2026-08-21
+
+One report model, every output format a CI could want.
+
+- **Versioned JSON report model** (`report_schema_version: 1`): the single source of truth
+  every format renders from — HTML, JSON (`--json`), JUnit XML (`--junit`), SARIF 2.1.0
+  (`--sarif`). The fingerprint discipline carries over: `run_hash` covers behaviour only,
+  timestamps live under `observation`.
+- **JUnit**: one testcase per check and per replayed fixture — FAIL → `<failure>`,
+  SKIP → `<skipped>`, WARN passes with its evidence in `<system-out>`.
+- **SARIF**: FAILs as `error`, WARNs as `warning`, drift classes as synthetic `REG-*` rules —
+  ready for the GitHub Security tab.
+- **Reusable GitHub Action** (`action.yml`, composite): point it at a server command or URL,
+  get the full audit plus all four artifacts, job fails unless ship-ready.
+- **Report UI**: sticky section navigation, per-check anchors (`report.html#SEC-03`),
+  All / Attention / Passed row filters, collapsible 24-row MSSS matrix — all vanilla JS,
+  self-contained, and print/PDF-safe (filters and collapse are neutralized in print CSS).
+
+
 ## 0.4.0 — 2026-08-21
 
 The conformance lane now covers every MCP surface, and the audit gains its static half:
