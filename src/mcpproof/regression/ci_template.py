@@ -17,9 +17,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install mcp-proof
-        # not on PyPI yet — install from the repo that delivered this report:
-        # pip install git+https://github.com/YuCPbit/mcp-proof
-        run: pip install mcp-proof
+        run: pip install git+https://github.com/YuCPbit/mcp-proof
       - name: Replay golden fixtures against the live server
         run: mcp-proof replay --fixtures {fixtures} {target}
 """

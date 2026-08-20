@@ -136,7 +136,7 @@ def test_sample_args_never_raises_on_garbage():
 def test_github_action_yaml_is_a_paste_ready_gate():
     yaml_text = github_action_yaml(["python", "-m", "my_server"], "fixtures/regression")
     assert "mcp-proof replay --fixtures fixtures/regression -- python -m my_server" in yaml_text
-    assert "pip install mcp-proof" in yaml_text
+    assert "pip install git+https://github.com/YuCPbit/mcp-proof" in yaml_text
     assert "setup-python" in yaml_text
     assert "contract" in yaml_text
 

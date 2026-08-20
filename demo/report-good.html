@@ -101,7 +101,7 @@
 
   <dl class="meta">
     <dt>Server under test</dt><dd class="mono">.venv/bin/python demo/good_server.py</dd>
-    <dt>Generated</dt><dd>2026-08-20 15:21 UTC · mcp-proof v0.2.0</dd>
+    <dt>Generated</dt><dd>2026-08-20 15:38 UTC · mcp-proof v0.2.0</dd>
     <dt>Protocol</dt><dd>negotiated <span class="mono">2025-11-25</span>
        · <span class="note-warn">latest spec is 2026-07-28 — migration recommended</span></dd>
     <dt>Run fingerprint</dt><dd class="mono">sha256:70db2e0378fe85ecbb52e495338596ab147fc830627876b8e57ee9509e49f43a</dd>
@@ -783,9 +783,7 @@ jobs:
         with:
           python-version: &#34;3.11&#34;
       - name: Install mcp-proof
-        # not on PyPI yet — install from the repo that delivered this report:
-        # pip install git+https://github.com/YuCPbit/mcp-proof
-        run: pip install mcp-proof
+        run: pip install git+https://github.com/YuCPbit/mcp-proof
       - name: Replay golden fixtures against the live server
         run: mcp-proof replay --fixtures demo/fixtures-good -- .venv/bin/python demo/good_server.py
 </pre>
