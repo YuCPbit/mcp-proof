@@ -1,9 +1,9 @@
 {
   "schema_version": 3,
   "tool": "search_docs",
-  "case": "golden",
+  "case": "empty-string",
   "args": {
-    "query": "example"
+    "query": ""
   },
   "response": {
     "is_error": false,
@@ -17,10 +17,10 @@
       "result": "Refund window is 30 days from purchase; see policy section 4.2."
     }
   },
-  "contract_sha256": "da1601ae74b47e0b4445f27530eba703f1046319f2ddf7b2c638cc9f7c55631f",
+  "contract_sha256": "262584757a0e4b34cd1403b63cbee33b677cb6fa84c567557d2ca7b9355f9985",
   "observation": {
-    "latency_ms": 2,
-    "recorded_at": "2026-08-20T22:40:30.936669+00:00",
+    "latency_ms": 1,
+    "recorded_at": "2026-08-20T22:40:30.942496+00:00",
     "server_cmd": [
       ".venv/bin/python",
       "demo/good_server.py"

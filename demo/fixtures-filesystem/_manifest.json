@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "created_at": "2026-08-20T19:32:04.354105+00:00",
+  "created_at": "2026-08-20T22:42:12.626275+00:00",
   "fixtures": [
     "read_file__e8cf9eda.json",
     "read_file__0c5f5c79.json",
@@ -37,7 +37,7 @@
     "get_file_info__518341a7.json",
     "list_allowed_directories__44136fa3.json"
   ],
-  "fixtures_sha256": "b62169afaee16d9aff011978e2b737542071b57cbf648ad67c6b5b3de46d6da0",
+  "fixtures_sha256": "866dc865fd9ca3735355ca4afe2b070c40fc8ce8d6fd072ae4bcf34e94803bbb",
   "skipped_destructive": [
     "write_file",
     "edit_file",

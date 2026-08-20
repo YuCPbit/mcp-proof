@@ -16,7 +16,7 @@
 
 <img src="demo/report-filesystem.png" width="760" alt="mcp-proof 对官方 MCP filesystem 服务器的交付报告——SHIP-READY，11/11 MUST 检查通过，完整 MSSS 合规表，34/34 回归全清">
 
-*对官方 MCP filesystem 服务器的真实审计：15 项协议检查、MSSS 合规表、34 个回归 fixtures——全绿。*
+*对官方 MCP filesystem 服务器的真实审计：25 项协议检查、MSSS 合规表、34 个回归 fixtures——全绿。*
 
 </div>
 
@@ -59,9 +59,10 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 | 审计对象 | 判定 | 报告 |
 |---|---|---|
-| **官方 MCP filesystem 服务器**（`@modelcontextprotocol/server-filesystem`） | ✅ SHIP-READY —— 11/11 MUST 检查通过，34/34 回归全清 | [HTML](demo/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
+| **官方 MCP filesystem 服务器**（`@modelcontextprotocol/server-filesystem`） | ✅ SHIP-READY —— 11/11 MUST 检查通过，34/34 回归全清，4 个写型工具自动跳过 | [HTML](demo/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
+| **2026-07-28 现代时代服务器**（零依赖，与官方 v2 SDK 交叉互验） | ✅ SHIP-READY —— `server/discover` 自动识别时代，21/21 MUST 含负向探测，2/2 回归全清 | [HTML](demo/report-modern.html) |
 | 埋了 **9 处违规**的演示服务器 | ❌ NOT SHIP-READY —— 5 项 MUST 失败 + 3 项安全发现，逐一带证据抓出 | [HTML](demo/report-bad.html) |
-| 行为规范的演示服务器 | ✅ SHIP-READY —— 三车道全过，含回归基线 | [HTML](demo/report-good.html) |
+| 行为规范的演示服务器 | ✅ SHIP-READY —— 16/16 MUST，三车道全过，含回归基线 | [HTML](demo/report-good.html) |
 
 ## 🔬 三条审计车道
 

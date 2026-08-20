@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>docs-helper — MCP Delivery Report</title>
+<title>modern-era demo (2026-07-28) — MCP Delivery Report</title>
 <style>
   :root {
     color-scheme: light;
@@ -123,25 +123,25 @@
   </nav>
 
   <div class="brand"><span class="mark">mcp-proof</span><span class="doc">Delivery report</span></div>
-  <h1>docs-helper</h1>
+  <h1>modern-era demo (2026-07-28)</h1>
 
   
   <div class="verdict pass">✓ SHIP-READY <span class="why">— all MUST checks pass, no security findings, no behavioural drift</span></div>
   
 
   <dl class="meta">
-    <dt>Server under test</dt><dd class="mono">.venv/bin/python demo/good_server.py</dd>
-    <dt>Generated</dt><dd>2026-08-20 22:40 UTC · mcp-proof v0.6.0</dd>
-    <dt>Protocol</dt><dd>negotiated <span class="mono">2025-11-25</span> · initialize-handshake era
-       · <span class="note-warn">newest initialize-handshake revision</span></dd>
-    <dt>Run fingerprint</dt><dd class="mono">sha256:52ac235fd0778d3929911aeb8ec8548c0f021c8bf57f2270f2184fc6315e0262</dd>
+    <dt>Server under test</dt><dd class="mono">.venv/bin/python tests/modern_target_server.py</dd>
+    <dt>Generated</dt><dd>2026-08-20 22:42 UTC · mcp-proof v0.6.0</dd>
+    <dt>Protocol</dt><dd>selected <span class="mono">2026-07-28</span> · modern era (server/discover)
+      </dd>
+    <dt>Run fingerprint</dt><dd class="mono">sha256:db65617122fc4723b3e602bf75e4e00ee72f76054c0b2234738cbb8627482e49</dd>
   </dl>
 
   <div class="tiles">
     <div class="tile" style="--tile-accent: var(--good)">
       <div class="k">Conformance</div>
-      <div class="v">16/16</div>
-      <div class="s">MUST checks passed · 6/7 SHOULD</div>
+      <div class="v">21/21</div>
+      <div class="s">MUST checks passed · 8/8 SHOULD</div>
     </div>
     <div class="tile" style="--tile-accent: var(--good)">
       <div class="k">Security</div>
@@ -151,7 +151,7 @@
     <div class="tile" style="--tile-accent: var(--good)">
       <div class="k">Behaviour regression</div>
       
-      <div class="v">13/13</div>
+      <div class="v">2/2</div>
       <div class="s">replays clean · gate PASS</div>
       
     </div>
@@ -164,35 +164,13 @@
     <thead><tr><th>Check</th><th>Level</th><th>Result</th><th>Details</th></tr></thead>
     <tbody>
     
-      <tr id="LIFE-01" data-status="PASS">
-        <td class="id">LIFE-01</td>
+      <tr id="DISC-01" data-status="PASS">
+        <td class="id">DISC-01</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
-          <div class="title">initialize returns protocolVersion, capabilities and serverInfo</div>
-          <div class="evidence">protocolVersion, capabilities and serverInfo all present</div>
-          
-        </td>
-      </tr>
-    
-      <tr id="LIFE-02" data-status="PASS">
-        <td class="id">LIFE-02</td>
-        <td class="level">SHOULD</td>
-        <td><span class="badge pass">✓ PASS</span></td>
-        <td>
-          <div class="title">server negotiates the newest handshake revision (2025-11-25)</div>
-          <div class="evidence">negotiated 2025-11-25, the newest revision the initialize handshake carries</div>
-          
-        </td>
-      </tr>
-    
-      <tr id="LIFE-03" data-status="PASS">
-        <td class="id">LIFE-03</td>
-        <td class="level">MUST</td>
-        <td><span class="badge pass">✓ PASS</span></td>
-        <td>
-          <div class="title">server answers tools/list after the initialized notification</div>
-          <div class="evidence">tools/list returned 4 tool(s) after initialized</div>
+          <div class="title">server/discover advertises supportedVersions and capabilities</div>
+          <div class="evidence">supportedVersions=[&#39;2026-07-28&#39;], capabilities: prompts, resources, tools, identity: modern-target</div>
           
         </td>
       </tr>
@@ -214,19 +192,19 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">unknown method gets a JSON-RPC error response</div>
-          <div class="evidence">unknown method rejected with error code -32602</div>
+          <div class="evidence">unknown method rejected with error code -32601</div>
           
         </td>
       </tr>
     
-      <tr id="RPC-02" data-status="FAIL">
+      <tr id="RPC-02" data-status="PASS">
         <td class="id">RPC-02</td>
         <td class="level">SHOULD</td>
-        <td><span class="badge fail">✗ FAIL</span></td>
+        <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">unknown method error code is -32601 (method not found)</div>
-          <div class="evidence">expected -32601, got -32602</div>
-          <div class="fix"><b>Fix:</b> Use JSON-RPC 2.0 code -32601 when rejecting unknown methods.</div>
+          <div class="evidence">expected -32601, got -32601</div>
+          
         </td>
       </tr>
     
@@ -241,13 +219,46 @@
         </td>
       </tr>
     
+      <tr id="ENV-01" data-status="PASS">
+        <td class="id">ENV-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">requests without the _meta protocol envelope are rejected</div>
+          <div class="evidence">request without _meta envelope rejected (code -32602)</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="VER-01" data-status="PASS">
+        <td class="id">VER-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">unsupported protocol versions are rejected with -32022</div>
+          <div class="evidence">version 1999-01-01 rejected with -32022, supported=[&#39;2026-07-28&#39;]</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="HTTP-01" data-status="SKIP">
+        <td class="id">HTTP-01</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">mismatched Mcp-Method routing headers are rejected with -32020</div>
+          <div class="evidence">routing headers only apply to the Streamable HTTP transport</div>
+          
+        </td>
+      </tr>
+    
       <tr id="TOOL-01" data-status="PASS">
         <td class="id">TOOL-01</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">every tool has a non-empty name and an inputSchema</div>
-          <div class="evidence">all 4 tools have a name and an inputSchema</div>
+          <div class="evidence">all 2 tools have a name and an inputSchema</div>
           
         </td>
       </tr>
@@ -258,7 +269,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">every tool has a non-empty description</div>
-          <div class="evidence">all 4 tools carry a description</div>
+          <div class="evidence">all 2 tools carry a description</div>
           
         </td>
       </tr>
@@ -269,7 +280,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">every tool inputSchema compiles as JSON Schema</div>
-          <div class="evidence">all 4 inputSchemas compile as JSON Schema draft 2020-12</div>
+          <div class="evidence">all 2 inputSchemas compile as JSON Schema draft 2020-12</div>
           
         </td>
       </tr>
@@ -280,7 +291,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">calling a nonexistent tool is rejected</div>
-          <div class="evidence">rejected as tool result with isError=true</div>
+          <div class="evidence">rejected as JSON-RPC error (code -32602)</div>
           
         </td>
       </tr>
@@ -291,7 +302,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">a call missing required arguments is rejected</div>
-          <div class="evidence">save_note with empty args rejected via isError=true</div>
+          <div class="evidence">echo with empty args rejected as JSON-RPC error (code -32602)</div>
           
         </td>
       </tr>
@@ -302,7 +313,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">declared outputSchemas compile and structured results match them</div>
-          <div class="evidence">save_note structuredContent validates against its outputSchema</div>
+          <div class="evidence">price structuredContent validates against its outputSchema</div>
           
         </td>
       </tr>
@@ -313,7 +324,18 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">declared input constraints are enforced</div>
-          <div class="evidence">6 schema-violating input(s) across 3 tool(s), all rejected</div>
+          <div class="evidence">4 schema-violating input(s) across 2 tool(s), all rejected</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="ORD-01" data-status="PASS">
+        <td class="id">ORD-01</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">tools/list returns tools in a deterministic order</div>
+          <div class="evidence">two calls returned 2 tool(s) in identical order</div>
           
         </td>
       </tr>
@@ -324,7 +346,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">advertised resources capability serves resources/list</div>
-          <div class="evidence">resources/list returned 0 resource(s)</div>
+          <div class="evidence">resources/list returned 1 resource(s)</div>
           
         </td>
       </tr>
@@ -335,18 +357,18 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">every resource carries a uri and a name</div>
-          <div class="evidence">all 0 resource(s) carry a uri and a name</div>
+          <div class="evidence">all 1 resource(s) carry a uri and a name</div>
           
         </td>
       </tr>
     
-      <tr id="RES-03" data-status="SKIP">
+      <tr id="RES-03" data-status="PASS">
         <td class="id">RES-03</td>
         <td class="level">MUST</td>
-        <td><span class="badge skip">– SKIP</span></td>
+        <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">resources/read returns contents for an advertised resource</div>
-          <div class="evidence">no listed resource to read</div>
+          <div class="evidence">read demo://readme: 1 content entr(y/ies), uri echoed</div>
           
         </td>
       </tr>
@@ -368,7 +390,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">advertised prompts capability serves prompts/list</div>
-          <div class="evidence">prompts/list returned 0 prompt(s)</div>
+          <div class="evidence">prompts/list returned 1 prompt(s)</div>
           
         </td>
       </tr>
@@ -379,18 +401,18 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">every prompt has a name and well-formed argument metadata</div>
-          <div class="evidence">all 0 prompt(s) carry valid metadata</div>
+          <div class="evidence">all 1 prompt(s) carry valid metadata</div>
           
         </td>
       </tr>
     
-      <tr id="PROMPT-03" data-status="SKIP">
+      <tr id="PROMPT-03" data-status="PASS">
         <td class="id">PROMPT-03</td>
         <td class="level">MUST</td>
-        <td><span class="badge skip">– SKIP</span></td>
+        <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">prompts/get rejects a call missing required arguments</div>
-          <div class="evidence">no prompt declares required arguments</div>
+          <div class="evidence">summarize with empty args rejected (code -32602)</div>
           
         </td>
       </tr>
@@ -413,6 +435,39 @@
         <td>
           <div class="title">declared capabilities match served features (prompts)</div>
           <div class="evidence">capabilities.prompts declared and prompts/list served</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="CACHE-01" data-status="PASS">
+        <td class="id">CACHE-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">tools/list results carry the required ttlMs and cacheScope</div>
+          <div class="evidence">all 5 cacheable result(s) carry ttlMs and cacheScope (prompts/list, resources/list, resources/read, tools/list)</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="RTYPE-01" data-status="PASS">
+        <td class="id">RTYPE-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">every result carries the required resultType field</div>
+          <div class="evidence">all 7 observed results carry resultType</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="META-01" data-status="PASS">
+        <td class="id">META-01</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">results identify the server via _meta serverInfo</div>
+          <div class="evidence">all 7 results carry _meta serverInfo</div>
           
         </td>
       </tr>
@@ -453,7 +508,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">no prompt-injection patterns in tool descriptions</div>
-          <div class="evidence">0 matches across 4 tools</div>
+          <div class="evidence">0 matches across 2 tools</div>
           
         </td>
       </tr>
@@ -464,7 +519,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">no invisible or bidi control characters in tool metadata</div>
-          <div class="evidence">0 invisible characters across 4 tools</div>
+          <div class="evidence">0 invisible characters across 2 tools</div>
           
         </td>
       </tr>
@@ -475,7 +530,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">no secret-looking strings in tool metadata</div>
-          <div class="evidence">0 secret-like strings across 4 tools</div>
+          <div class="evidence">0 secret-like strings across 2 tools</div>
           
         </td>
       </tr>
@@ -486,7 +541,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">injection-surface string params carry constraints</div>
-          <div class="evidence">0 unconstrained injection-surface params across 4 tools</div>
+          <div class="evidence">0 unconstrained injection-surface params across 2 tools</div>
           
         </td>
       </tr>
@@ -497,7 +552,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">tool descriptions stay under 2000 chars</div>
-          <div class="evidence">longest description 63 chars across 4 tools</div>
+          <div class="evidence">longest description 27 chars across 2 tools</div>
           
         </td>
       </tr>
@@ -508,7 +563,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">no tool advertises unconstrained arbitrary execution</div>
-          <div class="evidence">0 exec-style tools with free-form params across 4 tools</div>
+          <div class="evidence">0 exec-style tools with free-form params across 2 tools</div>
           
         </td>
       </tr>
@@ -876,92 +931,15 @@
     <tbody>
     
       <tr data-status="PASS">
-        <td class="id">save_note__4ba8cbdc.json</td>
-        <td>save_note</td>
+        <td class="id">echo__88dfa77a.json</td>
+        <td>echo</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">save_note__54555856.json</td>
-        <td>save_note</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">save_note__e7d4dc7b.json</td>
-        <td>save_note</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">save_note__aaceaae6.json</td>
-        <td>save_note</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">get_note__d8a17f15.json</td>
-        <td>get_note</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">get_note__52187cd4.json</td>
-        <td>get_note</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">get_note__cbfd3c9d.json</td>
-        <td>get_note</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">get_note__593a2b6d.json</td>
-        <td>get_note</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">calc_sum__54cb1b7a.json</td>
-        <td>calc_sum</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">search_docs__38e762cf.json</td>
-        <td>search_docs</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">search_docs__450fd5d6.json</td>
-        <td>search_docs</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">search_docs__b90f0eb6.json</td>
-        <td>search_docs</td>
-        <td><span class="badge ok">OK</span></td>
-        <td><div class="evidence"></div></td>
-      </tr>
-    
-      <tr data-status="PASS">
-        <td class="id">search_docs__fa61e7db.json</td>
-        <td>search_docs</td>
+        <td class="id">price__9b815a00.json</td>
+        <td>price</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
@@ -971,11 +949,11 @@
 
   <div class="leave">
     <h2>Leave-behind: your regression gate</h2>
-    <p>The recorded fixtures (<span style="font-family:var(--mono)">demo/fixtures-good</span>,
-       suite fingerprint <span style="font-family:var(--mono)">sha256:b86a3f0fd0e169e592100735ef08afd721e9675912b9d400ea289f931e04896b</span>)
+    <p>The recorded fixtures (<span style="font-family:var(--mono)">demo/fixtures-modern</span>,
+       suite fingerprint <span style="font-family:var(--mono)">sha256:2a58e631a0d2f8d5cb29b5cd8282cc2c712307158d2a5a5603a711b4f4534166</span>)
        are the behavioural contract of this server. Keep them in the repository and run the workflow below in CI —
        any breaking or value drift fails the build before it reaches your users.</p>
-    <pre># The recorded fixtures in demo/fixtures-good are the behavioral contract: any drift fails this job.
+    <pre># The recorded fixtures in demo/fixtures-modern are the behavioral contract: any drift fails this job.
 name: mcp-proof regression gate
 on:
   push:
@@ -991,7 +969,7 @@ jobs:
       - name: Install mcp-proof
         run: pip install git+https://github.com/YuCPbit/mcp-proof
       - name: Replay golden fixtures against the live server
-        run: mcp-proof replay --fixtures demo/fixtures-good -- .venv/bin/python demo/good_server.py
+        run: mcp-proof replay --fixtures demo/fixtures-modern -- .venv/bin/python tests/modern_target_server.py
 </pre>
   </div>
   
@@ -999,7 +977,9 @@ jobs:
   <h2 id="next-steps">Recommended next steps</h2>
   <ol class="steps">
     
-    <li><span class="prio p1">P1</span><span>RPC-02 — Use JSON-RPC 2.0 code -32601 when rejecting unknown methods.</span></li>
+    <li><span class="prio keep">KEEP</span><span>Commit the fixtures directory and the CI workflow above — behavioural drift will then fail the build before users see it.</span></li>
+    
+    <li><span class="prio keep">KEEP</span><span>Re-audit after the next MCP spec revision or any SDK upgrade; identical behaviour reproduces the same fingerprint, so before/after is provable.</span></li>
     
   </ol>
 
@@ -1007,9 +987,9 @@ jobs:
     Reproducible audit — the fingerprint covers every check outcome and behavioural replay verdict
     (never timestamps or latency measurements).
     Re-run with identical server behaviour and the hash matches:
-    <span class="mono">sha256:52ac235fd0778d3929911aeb8ec8548c0f021c8bf57f2270f2184fc6315e0262</span><br>
+    <span class="mono">sha256:db65617122fc4723b3e602bf75e4e00ee72f76054c0b2234738cbb8627482e49</span><br>
     Generated by mcp-proof v0.6.0 · deterministic lanes only, no LLM judging ·
-    MCP spec reference 2025-11-25 (initialize-handshake era)
+    MCP spec reference 2026-07-28 (modern era (server/discover))
   </footer>
 
 </div>

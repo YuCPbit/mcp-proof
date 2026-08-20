@@ -18,7 +18,7 @@
   "contract_sha256": "7b81ed319de2200ce732f9649b8ab6a460e950413df526103552188662c0ddbd",
   "observation": {
     "latency_ms": 0,
-    "recorded_at": "2026-08-20T19:32:04.322095+00:00",
+    "recorded_at": "2026-08-20T22:42:12.603574+00:00",
     "server_cmd": [
       "npx",
       "-y",

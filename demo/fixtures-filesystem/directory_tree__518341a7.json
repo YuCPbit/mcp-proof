@@ -10,17 +10,17 @@
     "content": [
       {
         "type": "text",
-        "text": "[]"
+        "text": "[\n  {\n    \"name\": \"readme.txt\",\n    \"type\": \"file\"\n  }\n]"
       }
     ],
     "structured": {
-      "content": "[]"
+      "content": "[\n  {\n    \"name\": \"readme.txt\",\n    \"type\": \"file\"\n  }\n]"
     }
   },
-  "contract_sha256": "38baee575fa7a40a246c8b6e2ad4d16a7c96259ffa5fad19fbc1c67671ddeea0",
+  "contract_sha256": "a9e9a6a42b55c4a192f6728bf62712e74d71b862505127b3297c38de63baf312",
   "observation": {
-    "latency_ms": 1,
-    "recorded_at": "2026-08-20T19:32:04.332191+00:00",
+    "latency_ms": 0,
+    "recorded_at": "2026-08-20T22:42:12.609058+00:00",
     "server_cmd": [
       "npx",
       "-y",

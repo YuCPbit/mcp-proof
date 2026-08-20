@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>secure-filesystem-server — MCP Delivery Report</title>
+<title>@modelcontextprotocol/server-filesystem — MCP Delivery Report</title>
 <style>
   :root {
     color-scheme: light;
@@ -83,17 +83,47 @@
   footer { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--hairline);
            font-size: 12px; color: var(--ink-3); }
   footer .mono { font-family: var(--mono); word-break: break-all; }
+  .nav { position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between;
+         align-items: center; gap: 12px; padding: 9px 2px; margin: 0 0 12px;
+         background: var(--page); border-bottom: 1px solid var(--hairline); font-size: 13px; }
+  .nav a { color: var(--ink-2); text-decoration: none; margin-right: 14px; }
+  .nav a:hover { color: var(--ink); }
+  .nav button { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+                border: 1px solid var(--hairline); background: var(--card); color: var(--ink-2); cursor: pointer; }
+  .nav button.on { border-color: var(--ink-2); color: var(--ink); font-weight: 600; }
+  tr:target td { background: rgba(250,178,25,.12); }
+  body[data-filter="attention"] tr[data-status="PASS"],
+  body[data-filter="attention"] tr[data-status="SKIP"],
+  body[data-filter="attention"] tr[data-status="OK"] { display: none; }
+  body[data-filter="passed"] tr[data-status]:not([data-status="PASS"]):not([data-status="OK"]) { display: none; }
+  .msss-toggle { font: inherit; font-size: 12px; padding: 2px 10px; margin-left: 6px; border-radius: 999px;
+                 border: 1px solid var(--hairline); background: var(--card); color: var(--ink-2); cursor: pointer; }
+  .msss-body.collapsed { display: none; }
   @media print {
     body { background: #fff; } .wrap { padding: 0; max-width: none; }
     tr, .tile { break-inside: avoid; }
+    .nav, .msss-toggle { display: none; }
+    .msss-body { display: block !important; }
+    tr[data-status] { display: table-row !important; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
 
+  <nav class="nav">
+    <span>
+      <a href="#conformance">Conformance</a><a href="#security">Security</a><a href="#msss">MSSS</a><a href="#regression">Regression</a><a href="#next-steps">Next steps</a>
+    </span>
+    <span>
+      <button data-filter="all" class="on">All</button>
+      <button data-filter="attention">Attention</button>
+      <button data-filter="passed">Passed</button>
+    </span>
+  </nav>
+
   <div class="brand"><span class="mark">mcp-proof</span><span class="doc">Delivery report</span></div>
-  <h1>secure-filesystem-server</h1>
+  <h1>@modelcontextprotocol/server-filesystem</h1>
 
   
   <div class="verdict pass">✓ SHIP-READY <span class="why">— all MUST checks pass, no security findings, no behavioural drift</span></div>
@@ -101,17 +131,17 @@
 
   <dl class="meta">
     <dt>Server under test</dt><dd class="mono">npx -y @modelcontextprotocol/server-filesystem /tmp/mcp-proof-sandbox</dd>
-    <dt>Generated</dt><dd>2026-08-20 19:32 UTC · mcp-proof v0.2.1</dd>
+    <dt>Generated</dt><dd>2026-08-20 22:42 UTC · mcp-proof v0.6.0</dd>
     <dt>Protocol</dt><dd>negotiated <span class="mono">2025-11-25</span> · initialize-handshake era
        · <span class="note-warn">newest initialize-handshake revision</span></dd>
-    <dt>Run fingerprint</dt><dd class="mono">sha256:f647396f1feb40e7f1c2a8d222d4055ea26a3f91b8fd036649eb7c34e98ee792</dd>
+    <dt>Run fingerprint</dt><dd class="mono">sha256:ff24d8392c55480748df4a255f66f8ba5a1664e01a71913568d3aed4de4da06a</dd>
   </dl>
 
   <div class="tiles">
     <div class="tile" style="--tile-accent: var(--good)">
       <div class="k">Conformance</div>
       <div class="v">11/11</div>
-      <div class="s">MUST checks passed · 4/4 SHOULD</div>
+      <div class="s">MUST checks passed · 7/7 SHOULD</div>
     </div>
     <div class="tile" style="--tile-accent: var(--good)">
       <div class="k">Security</div>
@@ -129,12 +159,12 @@
 
   
 
-  <h2>Protocol conformance</h2>
+  <h2 id="conformance">Protocol conformance</h2>
   <table>
     <thead><tr><th>Check</th><th>Level</th><th>Result</th><th>Details</th></tr></thead>
     <tbody>
     
-      <tr>
+      <tr id="LIFE-01" data-status="PASS">
         <td class="id">LIFE-01</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -145,7 +175,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="LIFE-02" data-status="PASS">
         <td class="id">LIFE-02</td>
         <td class="level">SHOULD</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -156,7 +186,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="LIFE-03" data-status="PASS">
         <td class="id">LIFE-03</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -167,7 +197,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="LIST-01" data-status="PASS">
         <td class="id">LIST-01</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -178,7 +208,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="RPC-01" data-status="PASS">
         <td class="id">RPC-01</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -189,7 +219,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="RPC-02" data-status="PASS">
         <td class="id">RPC-02</td>
         <td class="level">SHOULD</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -200,7 +230,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="RPC-03" data-status="PASS">
         <td class="id">RPC-03</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -211,7 +241,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="TOOL-01" data-status="PASS">
         <td class="id">TOOL-01</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -222,7 +252,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="TOOL-02" data-status="PASS">
         <td class="id">TOOL-02</td>
         <td class="level">SHOULD</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -233,7 +263,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="TOOL-03" data-status="PASS">
         <td class="id">TOOL-03</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -244,7 +274,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="TOOL-04" data-status="PASS">
         <td class="id">TOOL-04</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -255,7 +285,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="TOOL-05" data-status="PASS">
         <td class="id">TOOL-05</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -266,7 +296,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="TOOL-06" data-status="PASS">
         <td class="id">TOOL-06</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -277,7 +307,117 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="TOOL-07" data-status="PASS">
+        <td class="id">TOOL-07</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">declared input constraints are enforced</div>
+          <div class="evidence">6 schema-violating input(s) across 3 tool(s), all rejected</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="RES-01" data-status="SKIP">
+        <td class="id">RES-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">advertised resources capability serves resources/list</div>
+          <div class="evidence">resources capability not advertised</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="RES-02" data-status="SKIP">
+        <td class="id">RES-02</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">every resource carries a uri and a name</div>
+          <div class="evidence">resources/list unavailable</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="RES-03" data-status="SKIP">
+        <td class="id">RES-03</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">resources/read returns contents for an advertised resource</div>
+          <div class="evidence">no listed resource to read</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="RES-04" data-status="SKIP">
+        <td class="id">RES-04</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">resources/list pagination terminates (no cursor loop)</div>
+          <div class="evidence">no surface to paginate</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="PROMPT-01" data-status="SKIP">
+        <td class="id">PROMPT-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">advertised prompts capability serves prompts/list</div>
+          <div class="evidence">prompts capability not advertised</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="PROMPT-02" data-status="SKIP">
+        <td class="id">PROMPT-02</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">every prompt has a name and well-formed argument metadata</div>
+          <div class="evidence">prompts/list unavailable</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="PROMPT-03" data-status="SKIP">
+        <td class="id">PROMPT-03</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">prompts/get rejects a call missing required arguments</div>
+          <div class="evidence">no prompt declares required arguments</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="CAP-02" data-status="PASS">
+        <td class="id">CAP-02</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">declared capabilities match served features (resources)</div>
+          <div class="evidence">capabilities.resources not declared and resources/list not served</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="CAP-03" data-status="PASS">
+        <td class="id">CAP-03</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">declared capabilities match served features (prompts)</div>
+          <div class="evidence">capabilities.prompts not declared and prompts/list not served</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="HYG-01" data-status="PASS">
         <td class="id">HYG-01</td>
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -288,7 +428,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="CAP-01" data-status="PASS">
         <td class="id">CAP-01</td>
         <td class="level">SHOULD</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -302,12 +442,12 @@
     </tbody>
   </table>
 
-  <h2>Security &amp; hygiene</h2>
+  <h2 id="security">Security &amp; hygiene</h2>
   <table>
     <thead><tr><th>Check</th><th>Domain</th><th>Result</th><th>Details</th></tr></thead>
     <tbody>
     
-      <tr>
+      <tr id="SEC-01" data-status="PASS">
         <td class="id">SEC-01</td>
         <td class="level">MCP-INPUT-01</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -318,7 +458,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="SEC-02" data-status="PASS">
         <td class="id">SEC-02</td>
         <td class="level">MCP-INPUT-01</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -329,7 +469,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="SEC-03" data-status="PASS">
         <td class="id">SEC-03</td>
         <td class="level">MCP-LOG-02</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -340,7 +480,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="SEC-04" data-status="WARN">
         <td class="id">SEC-04</td>
         <td class="level">MCP-INPUT-02</td>
         <td><span class="badge warn">! WARN</span></td>
@@ -351,7 +491,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="SEC-05" data-status="PASS">
         <td class="id">SEC-05</td>
         <td class="level">MCP-INPUT-01</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -362,7 +502,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="SEC-06" data-status="PASS">
         <td class="id">SEC-06</td>
         <td class="level">MCP-EXEC-01,MCP-EXEC-02</td>
         <td><span class="badge pass">✓ PASS</span></td>
@@ -376,17 +516,19 @@
     </tbody>
   </table>
 
-  <h2>MSSS compliance</h2>
+  <h2 id="msss">MSSS compliance</h2>
   <p class="msss-lead"><b>L1: 2/2 auto-assessable controls met · 4 require manual review.</b>
      Mapped against MSSS v0.1 (control-level mapping v2.0 (2026-01-20)): 3 of
      24 controls are auto-assessable from this audit's deterministic checks; the remaining
      21 need deployment, code or process evidence and are marked manual review — never assessed
-     by this tool.</p>
+     by this tool.
+     <button class="msss-toggle" data-show="Show all 24 controls" data-hide="Collapse">Show all 24 controls</button></p>
+  <div class="msss-body collapsed">
   <table>
     <thead><tr><th>Control</th><th>Domain</th><th>Level</th><th>Result</th><th>Title</th></tr></thead>
     <tbody>
     
-      <tr>
+      <tr id="MCP-EXEC-01" data-status="SKIP">
         <td class="id">MCP-EXEC-01</td>
         <td class="level">Execution</td>
         <td class="level">L1</td>
@@ -400,7 +542,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-FS-01" data-status="SKIP">
         <td class="id">MCP-FS-01</td>
         <td class="level">Filesystem</td>
         <td class="level">L1</td>
@@ -414,7 +556,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-FS-02" data-status="SKIP">
         <td class="id">MCP-FS-02</td>
         <td class="level">Filesystem</td>
         <td class="level">L1</td>
@@ -428,7 +570,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-NET-01" data-status="SKIP">
         <td class="id">MCP-NET-01</td>
         <td class="level">Network</td>
         <td class="level">L1</td>
@@ -442,7 +584,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-INPUT-01" data-status="PASS">
         <td class="id">MCP-INPUT-01</td>
         <td class="level">Input Validation</td>
         <td class="level">L1</td>
@@ -456,7 +598,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-LOG-02" data-status="PASS">
         <td class="id">MCP-LOG-02</td>
         <td class="level">Logging</td>
         <td class="level">L1</td>
@@ -470,7 +612,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-SUPPLY-02" data-status="SKIP">
         <td class="id">MCP-SUPPLY-02</td>
         <td class="level">Supply Chain</td>
         <td class="level">L2</td>
@@ -484,7 +626,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-INPUT-02" data-status="PASS">
         <td class="id">MCP-INPUT-02</td>
         <td class="level">Input Validation</td>
         <td class="level">L2</td>
@@ -498,7 +640,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-INPUT-03" data-status="SKIP">
         <td class="id">MCP-INPUT-03</td>
         <td class="level">Input Validation</td>
         <td class="level">L2</td>
@@ -512,7 +654,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-NET-03" data-status="SKIP">
         <td class="id">MCP-NET-03</td>
         <td class="level">Network</td>
         <td class="level">L2</td>
@@ -526,7 +668,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-EXEC-02" data-status="SKIP">
         <td class="id">MCP-EXEC-02</td>
         <td class="level">Execution</td>
         <td class="level">L2</td>
@@ -540,7 +682,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-EXEC-03" data-status="SKIP">
         <td class="id">MCP-EXEC-03</td>
         <td class="level">Execution</td>
         <td class="level">L2</td>
@@ -554,7 +696,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-AUTHZ-01" data-status="SKIP">
         <td class="id">MCP-AUTHZ-01</td>
         <td class="level">Authorization</td>
         <td class="level">L3</td>
@@ -568,7 +710,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-AUTHZ-02" data-status="SKIP">
         <td class="id">MCP-AUTHZ-02</td>
         <td class="level">Authorization</td>
         <td class="level">L3</td>
@@ -582,7 +724,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-AUTHZ-03" data-status="SKIP">
         <td class="id">MCP-AUTHZ-03</td>
         <td class="level">Authorization</td>
         <td class="level">L3</td>
@@ -596,7 +738,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-AUTHZ-04" data-status="SKIP">
         <td class="id">MCP-AUTHZ-04</td>
         <td class="level">Authorization</td>
         <td class="level">L3</td>
@@ -610,7 +752,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-LOG-01" data-status="SKIP">
         <td class="id">MCP-LOG-01</td>
         <td class="level">Logging</td>
         <td class="level">L3</td>
@@ -624,7 +766,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-DEPLOY-01" data-status="SKIP">
         <td class="id">MCP-DEPLOY-01</td>
         <td class="level">Deployment</td>
         <td class="level">L3</td>
@@ -638,7 +780,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-FS-03" data-status="SKIP">
         <td class="id">MCP-FS-03</td>
         <td class="level">Filesystem</td>
         <td class="level">L4</td>
@@ -652,7 +794,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-SUPPLY-01" data-status="SKIP">
         <td class="id">MCP-SUPPLY-01</td>
         <td class="level">Supply Chain</td>
         <td class="level">L4</td>
@@ -666,7 +808,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-DEPLOY-03" data-status="SKIP">
         <td class="id">MCP-DEPLOY-03</td>
         <td class="level">Deployment</td>
         <td class="level">L4</td>
@@ -680,7 +822,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-NET-02" data-status="SKIP">
         <td class="id">MCP-NET-02</td>
         <td class="level">Network</td>
         <td class="level">L4</td>
@@ -694,7 +836,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-DEPLOY-02" data-status="SKIP">
         <td class="id">MCP-DEPLOY-02</td>
         <td class="level">Deployment</td>
         <td class="level">L4</td>
@@ -708,7 +850,7 @@
         </td>
       </tr>
     
-      <tr>
+      <tr id="MCP-DEPLOY-04" data-status="SKIP">
         <td class="id">MCP-DEPLOY-04</td>
         <td class="level">Deployment</td>
         <td class="level">L4</td>
@@ -725,245 +867,246 @@
     </tbody>
   </table>
   <p class="attrib">Control taxonomy from the MCP Server Security Standard (MSSS), CC BY-SA 4.0, mcp-security-standard.org.</p>
+  </div>
 
   
-  <h2>Behaviour regression</h2>
+  <h2 id="regression">Behaviour regression</h2>
   <table>
     <thead><tr><th>Fixture</th><th>Tool</th><th>Verdict</th><th>Detail</th></tr></thead>
     <tbody>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_file__e8cf9eda.json</td>
         <td>read_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_file__0c5f5c79.json</td>
         <td>read_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_file__fe0dcdc6.json</td>
         <td>read_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_file__518341a7.json</td>
         <td>read_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_text_file__e8cf9eda.json</td>
         <td>read_text_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_text_file__0c5f5c79.json</td>
         <td>read_text_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_text_file__fe0dcdc6.json</td>
         <td>read_text_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_text_file__518341a7.json</td>
         <td>read_text_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_media_file__e8cf9eda.json</td>
         <td>read_media_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_media_file__0c5f5c79.json</td>
         <td>read_media_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_media_file__fe0dcdc6.json</td>
         <td>read_media_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_media_file__518341a7.json</td>
         <td>read_media_file</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">read_multiple_files__dfea4edf.json</td>
         <td>read_multiple_files</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_directory__e8cf9eda.json</td>
         <td>list_directory</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_directory__0c5f5c79.json</td>
         <td>list_directory</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_directory__fe0dcdc6.json</td>
         <td>list_directory</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_directory__518341a7.json</td>
         <td>list_directory</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_directory_with_sizes__e8cf9eda.json</td>
         <td>list_directory_with_sizes</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_directory_with_sizes__0c5f5c79.json</td>
         <td>list_directory_with_sizes</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_directory_with_sizes__fe0dcdc6.json</td>
         <td>list_directory_with_sizes</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_directory_with_sizes__518341a7.json</td>
         <td>list_directory_with_sizes</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">directory_tree__e8cf9eda.json</td>
         <td>directory_tree</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">directory_tree__0c5f5c79.json</td>
         <td>directory_tree</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">directory_tree__fe0dcdc6.json</td>
         <td>directory_tree</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">directory_tree__518341a7.json</td>
         <td>directory_tree</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">search_files__580853a9.json</td>
         <td>search_files</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">search_files__83e4c665.json</td>
         <td>search_files</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">search_files__2831e0f1.json</td>
         <td>search_files</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">search_files__ee546753.json</td>
         <td>search_files</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">get_file_info__e8cf9eda.json</td>
         <td>get_file_info</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">get_file_info__0c5f5c79.json</td>
         <td>get_file_info</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">get_file_info__fe0dcdc6.json</td>
         <td>get_file_info</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">get_file_info__518341a7.json</td>
         <td>get_file_info</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
-      <tr>
+      <tr data-status="PASS">
         <td class="id">list_allowed_directories__44136fa3.json</td>
         <td>list_allowed_directories</td>
         <td><span class="badge ok">OK</span></td>
@@ -976,7 +1119,7 @@
   <div class="leave">
     <h2>Leave-behind: your regression gate</h2>
     <p>The recorded fixtures (<span style="font-family:var(--mono)">demo/fixtures-filesystem</span>,
-       suite fingerprint <span style="font-family:var(--mono)">sha256:b62169afaee16d9aff011978e2b737542071b57cbf648ad67c6b5b3de46d6da0</span>)
+       suite fingerprint <span style="font-family:var(--mono)">sha256:866dc865fd9ca3735355ca4afe2b070c40fc8ce8d6fd072ae4bcf34e94803bbb</span>)
        are the behavioural contract of this server. Keep them in the repository and run the workflow below in CI —
        any breaking or value drift fails the build before it reaches your users.</p>
     <pre># The recorded fixtures in demo/fixtures-filesystem are the behavioral contract: any drift fails this job.
@@ -1000,7 +1143,7 @@ jobs:
   </div>
   
 
-  <h2>Recommended next steps</h2>
+  <h2 id="next-steps">Recommended next steps</h2>
   <ol class="steps">
     
     <li><span class="prio p1">P1</span><span>SEC-04 — Add enum, pattern or maxLength to path/url/command-like string params.</span></li>
@@ -1011,11 +1154,31 @@ jobs:
     Reproducible audit — the fingerprint covers every check outcome and behavioural replay verdict
     (never timestamps or latency measurements).
     Re-run with identical server behaviour and the hash matches:
-    <span class="mono">sha256:f647396f1feb40e7f1c2a8d222d4055ea26a3f91b8fd036649eb7c34e98ee792</span><br>
-    Generated by mcp-proof v0.2.1 · deterministic lanes only, no LLM judging ·
-    MCP handshake-era spec reference 2025-11-25
+    <span class="mono">sha256:ff24d8392c55480748df4a255f66f8ba5a1664e01a71913568d3aed4de4da06a</span><br>
+    Generated by mcp-proof v0.6.0 · deterministic lanes only, no LLM judging ·
+    MCP spec reference 2025-11-25 (initialize-handshake era)
   </footer>
 
 </div>
+<script>
+(function () {
+  document.body.dataset.filter = "all";
+  var buttons = document.querySelectorAll(".nav button");
+  buttons.forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.body.dataset.filter = b.dataset.filter;
+      buttons.forEach(function (o) { o.classList.toggle("on", o === b); });
+    });
+  });
+  var body = document.querySelector(".msss-body");
+  var toggle = document.querySelector(".msss-toggle");
+  if (toggle && body) {
+    toggle.addEventListener("click", function () {
+      var hidden = body.classList.toggle("collapsed");
+      toggle.textContent = hidden ? toggle.dataset.show : toggle.dataset.hide;
+    });
+  }
+})();
+</script>
 </body>
 </html>

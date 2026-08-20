@@ -1,9 +1,9 @@
 {
   "schema_version": 3,
   "tool": "save_note",
-  "case": "golden",
+  "case": "empty-string",
   "args": {
-    "title": "example",
+    "title": "",
     "text": "example"
   },
   "response": {
@@ -11,17 +11,17 @@
     "content": [
       {
         "type": "text",
-        "text": "Saved note 'example' (7 chars)."
+        "text": "Saved note '' (7 chars)."
       }
     ],
     "structured": {
-      "result": "Saved note 'example' (7 chars)."
+      "result": "Saved note '' (7 chars)."
     }
   },
-  "contract_sha256": "58304412e95469c3b303783b6717b9df37fe7199d0cf76cabe589c432e07a665",
+  "contract_sha256": "a27b19e7776da15315f3acb431a126646d9aaf48cf16c303f7b164ece510e694",
   "observation": {
-    "latency_ms": 4,
-    "recorded_at": "2026-08-20T22:40:30.903201+00:00",
+    "latency_ms": 1,
+    "recorded_at": "2026-08-20T22:40:30.921971+00:00",
     "server_cmd": [
       ".venv/bin/python",
       "demo/good_server.py"

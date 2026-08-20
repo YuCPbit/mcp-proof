@@ -16,7 +16,7 @@
 
 <img src="demo/report-filesystem.png" width="760" alt="mcp-proof delivery report for the official MCP filesystem server — SHIP-READY, 11/11 MUST checks, full MSSS compliance table, 34/34 replays clean">
 
-*A real audit of the official MCP filesystem server: 15 conformance checks, MSSS compliance table, 34 regression fixtures — all green.*
+*A real audit of the official MCP filesystem server: 25 conformance checks, MSSS compliance table, 34 regression fixtures — all green.*
 
 </div>
 
@@ -62,9 +62,10 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 | Target | Verdict | Report |
 |---|---|---|
-| **Official MCP filesystem server** (`@modelcontextprotocol/server-filesystem`) | ✅ SHIP-READY — 11/11 MUST checks, 34/34 replays clean | [HTML](demo/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
+| **Official MCP filesystem server** (`@modelcontextprotocol/server-filesystem`) | ✅ SHIP-READY — 11/11 MUST checks, 34/34 replays clean, 4 write tools auto-skipped | [HTML](demo/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
+| **2026-07-28 modern-era server** (zero-dep, cross-validated against the official v2 SDK) | ✅ SHIP-READY — era auto-detected via `server/discover`, 21/21 MUST incl. negative probes, 2/2 replays | [HTML](demo/report-modern.html) |
 | Demo server with **9 planted violations** | ❌ NOT SHIP-READY — 5 MUST failures + 3 security findings, every one caught with evidence | [HTML](demo/report-bad.html) |
-| Well-behaved demo server | ✅ SHIP-READY — full three-lane pass incl. regression baseline | [HTML](demo/report-good.html) |
+| Well-behaved demo server | ✅ SHIP-READY — 16/16 MUST, full three-lane pass incl. regression baseline | [HTML](demo/report-good.html) |
 
 ## 🔬 The three lanes
 

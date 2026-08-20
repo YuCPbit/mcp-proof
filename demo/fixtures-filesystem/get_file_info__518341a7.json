@@ -10,17 +10,17 @@
     "content": [
       {
         "type": "text",
-        "text": "size: 64\ncreated: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nmodified: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\naccessed: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nisDirectory: true\nisFile: false\npermissions: 755"
+        "text": "size: 96\ncreated: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nmodified: Fri Aug 21 2026 06:40:22 GMT+0800 (China Standard Time)\naccessed: Fri Aug 21 2026 06:42:12 GMT+0800 (China Standard Time)\nisDirectory: true\nisFile: false\npermissions: 755"
       }
     ],
     "structured": {
-      "content": "size: 64\ncreated: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nmodified: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\naccessed: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nisDirectory: true\nisFile: false\npermissions: 755"
+      "content": "size: 96\ncreated: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nmodified: Fri Aug 21 2026 06:40:22 GMT+0800 (China Standard Time)\naccessed: Fri Aug 21 2026 06:42:12 GMT+0800 (China Standard Time)\nisDirectory: true\nisFile: false\npermissions: 755"
     }
   },
-  "contract_sha256": "8ce7ed819f2a3ce2c9b84f6a691fa37e936f5c10243bb2adcebc17a442a8e5b2",
+  "contract_sha256": "e16b26d926f559a464affbb0381b4a45a3801242dab715bc6062cbe05caaeb26",
   "observation": {
     "latency_ms": 1,
-    "recorded_at": "2026-08-20T19:32:04.338956+00:00",
+    "recorded_at": "2026-08-20T22:42:12.616629+00:00",
     "server_cmd": [
       "npx",
       "-y",
