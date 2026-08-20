@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 
 from .checks.base import FAIL, MUST
-from .client import RawProbe
 from .report.builder import build_report
 
 
@@ -47,49 +46,56 @@ def _export_pdf(html_path: Path) -> Path | None:
     return pdf_path
 
 
-def _probe_ctx(cmd: list[str] | None, url: str | None):
-    if url:
-        from .client_http import HttpProbe
+async def _regression_lane(args, cmd: list[str] | None, url: str | None) -> dict:
+    from .regression.ci_template import github_action_yaml
+    from .regression.recorder import record
+    from .regression.replayer import replay, summarize
 
-        return HttpProbe(url)
-    return RawProbe(cmd)
-
-
-async def _meta_probe(
-    cmd: list[str] | None, url: str | None = None
-) -> tuple[str | None, str | None, list[dict]]:
-    """One quick handshake: negotiated protocol, server-reported name, tool list."""
-    async with _probe_ctx(cmd, url) as p:
-        init = await p.initialize()
-        if not init or "result" not in init:
-            return None, None, []
-        result = init["result"]
-        negotiated = result.get("protocolVersion")
-        name = (result.get("serverInfo") or {}).get("name")
-        tools_resp = await p.request("tools/list")
-        tools = []
-        if tools_resp and "result" in tools_resp:
-            tools = tools_resp["result"].get("tools", [])
-        return negotiated, name, tools
+    fdir = Path(args.fixtures)
+    manifest = fdir / "_manifest.json"
+    if not manifest.exists():
+        print(f"→ regression lane: no baseline at {fdir}, recording one")
+        skipped: list[str] = []
+        await record(cmd, fdir, include_destructive=args.include_destructive,
+                     skipped_out=skipped, edge_cases=getattr(args, "edge_cases", False),
+                     url=url)
+        if skipped:
+            print(f"  ⚠ skipped {len(skipped)} potentially destructive tool(s): "
+                  f"{', '.join(skipped)} (--include-destructive to record them)")
+    print("→ regression lane: replaying fixtures")
+    drifts = await replay(cmd, fdir, url=url)
+    fixtures_sha = ""
+    if manifest.exists():
+        fixtures_sha = json.loads(manifest.read_text()).get("fixtures_sha256", "")
+    return {
+        "summary": summarize(drifts),
+        "drifts": drifts,
+        "fixtures_sha256": fixtures_sha,
+        "fixtures_dir": str(fdir),
+        "action_yaml": github_action_yaml(cmd, str(fdir), url=url),
+    }
 
 
 async def _cmd_run(args) -> int:
     from .checks.conformance import run_conformance
     from .checks.security import run_security
-    from .regression.ci_template import github_action_yaml
-    from .regression.recorder import record
-    from .regression.replayer import replay, summarize
+    from .era import MODERN
 
     cmd = args.server_cmd or None
     url = getattr(args, "url", None)
     if getattr(args, "semantic", False):
         print("note: --semantic (LLM lane) is reserved for a future release — skipping it; "
               "all lanes below are deterministic")
-    negotiated, reported_name, tools = await _meta_probe(cmd, url)
+
+    print(f"→ conformance lane (era: {getattr(args, 'era', 'auto')})")
+    outcome = await run_conformance(cmd, url=url, era=getattr(args, "era", "auto"))
+    conf = outcome.results
+    tools = outcome.tools
+
     if args.server_name:
         server_name = args.server_name
-    elif reported_name:
-        server_name = reported_name
+    elif outcome.server_name:
+        server_name = outcome.server_name
     elif cmd:
         server_name = Path(cmd[-1]).stem
     else:
@@ -97,41 +103,30 @@ async def _cmd_run(args) -> int:
 
         server_name = urlparse(url).hostname or url
 
-    print(f"→ conformance lane ({server_name})")
-    conf = await run_conformance(cmd, url=url)
+    print(f"  {server_name}: {outcome.era} era"
+          + (f", revision {outcome.revision}" if outcome.revision else ""))
     print(f"→ security lane ({len(tools)} tools)")
     sec = run_security(tools)
 
     regression = None
     if args.fixtures:
-        fdir = Path(args.fixtures)
-        manifest = fdir / "_manifest.json"
-        if not manifest.exists():
-            print(f"→ regression lane: no baseline at {fdir}, recording one")
-            skipped: list[str] = []
-            await record(cmd, fdir, include_destructive=args.include_destructive,
-                         skipped_out=skipped, edge_cases=getattr(args, "edge_cases", False),
-                         url=url)
-            if skipped:
-                print(f"  ⚠ skipped {len(skipped)} potentially destructive tool(s): "
-                      f"{', '.join(skipped)} (--include-destructive to record them)")
-        print("→ regression lane: replaying fixtures")
-        drifts = await replay(cmd, fdir, url=url)
-        fixtures_sha = ""
-        if manifest.exists():
-            fixtures_sha = json.loads(manifest.read_text()).get("fixtures_sha256", "")
-        regression = {
-            "summary": summarize(drifts),
-            "drifts": drifts,
-            "fixtures_sha256": fixtures_sha,
-            "fixtures_dir": str(fdir),
-            "action_yaml": github_action_yaml(cmd, str(fdir), url=url),
-        }
+        try:
+            regression = await _regression_lane(args, cmd, url)
+        except Exception as exc:
+            if outcome.era != MODERN:
+                raise
+            # the recorder rides the legacy SDK session; a modern-only server
+            # rejects it — an audit gap to report, not a crash
+            print(f"  ⚠ regression lane skipped: the recorder speaks the legacy handshake, "
+                  f"which this modern-era server rejected ({type(exc).__name__}); "
+                  "SDK-session modernization is tracked for a later v0.3 increment")
 
     out = build_report(
         server_name=server_name,
         server_cmd=cmd if cmd else ["--url", url],
-        negotiated_protocol=negotiated,
+        negotiated_protocol=outcome.revision,
+        protocol_era=outcome.era,
+        discovery=outcome.discovery,
         conformance=conf,
         security=sec,
         regression=regression,

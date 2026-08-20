@@ -10,7 +10,7 @@ STARTER_CMD = [venv_python(), str(ROOT / "templates" / "server-starter" / "serve
 
 
 async def test_starter_template_is_audit_clean():
-    conformance = await run_conformance(STARTER_CMD)
+    conformance = (await run_conformance(STARTER_CMD)).results
     by_id = {r.id: r for r in conformance}
 
     must_bad = [

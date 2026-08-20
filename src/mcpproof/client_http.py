@@ -18,6 +18,7 @@ from mcp.client.streamable_http import streamable_http_client
 
 from . import LATEST_LEGACY_SPEC, __version__
 from .client import DEFAULT_TIMEOUT
+from .era import MCP_METHOD_HEADER, MCP_NAME_HEADER, NAME_BEARING_METHODS, modern_envelope
 
 ACCEPT = "application/json, text/event-stream"
 MCP_SESSION_ID = "mcp-session-id"
@@ -44,8 +45,21 @@ class HttpProbe:
         self.server_messages: list[dict] = []
         self.session_id: str | None = None
         self.protocol_version: str | None = None
+        # set via enable_modern(): stamped into params._meta on every request
+        self.modern_meta: dict | None = None
+        self._modern_revision: str | None = None
+        # (method, result) for every result envelope received — modern-era
+        # checks (resultType, _meta serverInfo) read the session's evidence here
+        self.observed_results: list[tuple[str, dict]] = []
         self._client: httpx.AsyncClient | None = None
         self._next_id = 0
+
+    def enable_modern(self, revision: str) -> None:
+        """Speak the 2026-07-28 era: every request carries the _meta envelope
+        plus the Mcp-Method / Mcp-Name / MCP-Protocol-Version headers, and no
+        protocol session is expected (SEP-2567 removed Mcp-Session-Id)."""
+        self.modern_meta = modern_envelope(revision, "mcp-proof", __version__)
+        self._modern_revision = revision
 
     async def __aenter__(self) -> "HttpProbe":
         self._client = httpx.AsyncClient(timeout=None, follow_redirects=True)
@@ -62,18 +76,32 @@ class HttpProbe:
                 pass
         await self._client.aclose()
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(self, msg: dict | None = None, overrides: dict | None = None) -> dict[str, str]:
         headers = {"accept": ACCEPT, "content-type": "application/json"}
-        if self.session_id:
-            headers[MCP_SESSION_ID] = self.session_id
-        if self.protocol_version:
-            headers[MCP_PROTOCOL_VERSION] = self.protocol_version
+        if self.modern_meta is not None:
+            # SEP-2243 routing headers; no session header in the modern era
+            headers[MCP_PROTOCOL_VERSION] = self._modern_revision or ""
+            if msg is not None:
+                headers[MCP_METHOD_HEADER] = str(msg.get("method", ""))
+                name_key = NAME_BEARING_METHODS.get(msg.get("method", ""))
+                params = msg.get("params") or {}
+                if name_key and isinstance(params, dict) and name_key in params:
+                    headers[MCP_NAME_HEADER] = str(params[name_key])
+        else:
+            if self.session_id:
+                headers[MCP_SESSION_ID] = self.session_id
+            if self.protocol_version:
+                headers[MCP_PROTOCOL_VERSION] = self.protocol_version
+        if overrides:
+            headers.update(overrides)
         return headers
 
-    async def _post(self, msg: dict, req_id: int | None) -> dict | None:
+    async def _post(
+        self, msg: dict, req_id: int | None, header_overrides: dict | None = None
+    ) -> dict | None:
         assert self._client
         async with self._client.stream(
-            "POST", self.url, json=msg, headers=self._headers()
+            "POST", self.url, json=msg, headers=self._headers(msg, header_overrides)
         ) as response:
             sid = response.headers.get(MCP_SESSION_ID)
             if sid:
@@ -125,21 +153,28 @@ class HttpProbe:
         return dispatch()
 
     async def request(
-        self, method: str, params: dict | None = None, timeout: float | None = None
+        self, method: str, params: dict | None = None, timeout: float | None = None,
+        header_overrides: dict | None = None,
     ) -> dict | None:
         """Send a request; return the raw response envelope, or None on
         timeout or transport error."""
         self._next_id += 1
         req_id = self._next_id
         msg: dict = {"jsonrpc": "2.0", "id": req_id, "method": method}
+        if self.modern_meta is not None and method != "initialize":
+            params = {**(params or {})}
+            params.setdefault("_meta", self.modern_meta)
         if params is not None:
             msg["params"] = params
         try:
-            return await asyncio.wait_for(
-                self._post(msg, req_id), timeout or self.timeout
+            resp = await asyncio.wait_for(
+                self._post(msg, req_id, header_overrides), timeout or self.timeout
             )
         except _TRANSPORT_ERRORS:
             return None
+        if isinstance(resp, dict) and isinstance(resp.get("result"), dict):
+            self.observed_results.append((method, resp["result"]))
+        return resp
 
     async def notify(self, method: str, params: dict | None = None) -> None:
         msg: dict = {"jsonrpc": "2.0", "method": method}

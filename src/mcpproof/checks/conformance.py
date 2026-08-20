@@ -1,8 +1,15 @@
 """Conformance lane: wire-level lifecycle, JSON-RPC and tool-metadata checks.
 
-Everything runs over a single RawProbe pass so the report reflects one
-coherent server session (and stdout hygiene is judged across all of it).
+Dual-era (SEP-2575). Era selection mirrors the official client's auto mode:
+``server/discover`` is probed first and anything that is not positive modern
+evidence falls back to the legacy ``initialize`` handshake — on a fresh
+probe, because a dual-era server locks a connection to the era of its first
+frame and the audit must never observe a session perturbed by its own
+negotiation. Each era then runs its own check set over a single coherent
+probe session (stdout hygiene is judged across all of it).
 """
+
+from dataclasses import dataclass, field
 
 from jsonschema import Draft202012Validator
 from jsonschema import validate as jsonschema_validate
@@ -10,9 +17,23 @@ from jsonschema.exceptions import SchemaError, ValidationError
 
 from .. import KNOWN_SPECS, LATEST_LEGACY_SPEC, LATEST_SPEC
 from ..client import RawProbe
+from ..era import (
+    AUTO,
+    HEADER_MISMATCH,
+    LEGACY,
+    MODERN,
+    RESULT_TYPES,
+    SERVER_INFO_META_KEY,
+    UNSUPPORTED_PROTOCOL_VERSION,
+    EraInfo,
+    parse_discover_result,
+)
 from .base import FAIL, MUST, PASS, SHOULD, SKIP, WARN, CheckResult
 
+DISCOVER_TIMEOUT = 8.0  # era probe: snappy fallback beats a full request timeout
+
 _CHECKS: dict[str, tuple[str, str, str]] = {
+    # ---- legacy era (initialize handshake) ----
     "LIFE-01": (
         "initialize returns protocolVersion, capabilities and serverInfo",
         MUST,
@@ -29,6 +50,53 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
         MUST,
         "Keep serving requests after the handshake; tools/list must return a result.",
     ),
+    # ---- modern era (2026-07-28, server/discover) ----
+    "DISC-01": (
+        "server/discover advertises supportedVersions and capabilities",
+        MUST,
+        "Answer server/discover with supportedVersions and capabilities "
+        "(identity travels in the result's _meta).",
+    ),
+    "ENV-01": (
+        "requests without the _meta protocol envelope are rejected",
+        MUST,
+        "Reject requests missing io.modelcontextprotocol/protocolVersion and "
+        "clientCapabilities in params._meta (INVALID_PARAMS).",
+    ),
+    "VER-01": (
+        "unsupported protocol versions are rejected with -32022",
+        MUST,
+        "Return UnsupportedProtocolVersionError (-32022) with the supported list "
+        "when a request names a protocol version the server does not speak.",
+    ),
+    "RTYPE-01": (
+        "every result carries the required resultType field",
+        MUST,
+        'Stamp resultType ("complete" or "input_required") on every result object.',
+    ),
+    "CACHE-01": (
+        "tools/list results carry the required ttlMs and cacheScope",
+        MUST,
+        'Return ttlMs (milliseconds) and cacheScope ("public"/"private") on list results '
+        "(CacheableResult, SEP-2549).",
+    ),
+    "META-01": (
+        "results identify the server via _meta serverInfo",
+        SHOULD,
+        "Include io.modelcontextprotocol/serverInfo in each result's _meta.",
+    ),
+    "ORD-01": (
+        "tools/list returns tools in a deterministic order",
+        SHOULD,
+        "Return tools in a stable order so clients and LLM prompt caches can rely on it.",
+    ),
+    "HTTP-01": (
+        "mismatched Mcp-Method routing headers are rejected with -32020",
+        SHOULD,
+        "Validate the Mcp-Method / Mcp-Name headers against the request body and "
+        "reject mismatches with HeaderMismatchError (-32020).",
+    ),
+    # ---- shared across eras ----
     "RPC-01": (
         "unknown method gets a JSON-RPC error response",
         MUST,
@@ -77,7 +145,7 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
     "CAP-01": (
         "declared capabilities match served features (tools)",
         SHOULD,
-        "Declare capabilities.tools in initialize exactly when the server serves tools/list.",
+        "Declare capabilities.tools exactly when the server serves tools/list.",
     ),
     "LIST-01": (
         "tools/list pagination terminates (no cursor loop)",
@@ -91,6 +159,29 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
     ),
 }
 
+_SHARED_IDS = (
+    "RPC-01", "RPC-02", "RPC-03",
+    "TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05", "TOOL-06",
+    "LIST-01", "HYG-01", "CAP-01",
+)
+_LEGACY_IDS = ("LIFE-01", "LIFE-02", "LIFE-03", *_SHARED_IDS)
+_MODERN_IDS = (
+    "DISC-01", "ENV-01", "VER-01", "RTYPE-01", "CACHE-01", "META-01", "ORD-01", "HTTP-01",
+    *_SHARED_IDS,
+)
+
+
+@dataclass
+class ConformanceOutcome:
+    """Check results plus what era detection learned (feeds report + other lanes)."""
+
+    results: list[CheckResult]
+    era: str  # "modern" | "legacy"
+    revision: str | None = None
+    discovery: str | None = None  # "server/discover" | "initialize"
+    server_name: str | None = None
+    tools: list = field(default_factory=list)
+
 
 def _res(check_id: str, status: str, evidence: str = "") -> CheckResult:
     title, level, fix_hint = _CHECKS[check_id]
@@ -102,7 +193,13 @@ def _res(check_id: str, status: str, evidence: str = "") -> CheckResult:
 
 def _handshake_failed(detail: str) -> list[CheckResult]:
     out = [_res("LIFE-01", FAIL, detail)]
-    out += [_res(cid, SKIP, "handshake failed") for cid in _CHECKS if cid != "LIFE-01"]
+    out += [_res(cid, SKIP, "handshake failed") for cid in _LEGACY_IDS if cid != "LIFE-01"]
+    return out
+
+
+def _discover_failed(detail: str) -> list[CheckResult]:
+    out = [_res("DISC-01", FAIL, detail)]
+    out += [_res(cid, SKIP, "server/discover failed") for cid in _MODERN_IDS if cid != "DISC-01"]
     return out
 
 
@@ -125,27 +222,80 @@ async def _failure_context(probe) -> str:
         return ""
 
 
-async def run_conformance(cmd: list[str] | None, url: str | None = None) -> list[CheckResult]:
+def _make_probe(cmd: list[str] | None, url: str | None):
+    if url:
+        from ..client_http import HttpProbe
+
+        return HttpProbe(url)
+    return RawProbe(cmd)
+
+
+async def run_conformance(
+    cmd: list[str] | None, url: str | None = None, era: str = AUTO
+) -> ConformanceOutcome:
     try:
-        if url:
-            from ..client_http import HttpProbe
-
-            async with HttpProbe(url) as probe:
-                return await _run_checks(probe)
-        async with RawProbe(cmd) as probe:
-            return await _run_checks(probe)
+        if era in (AUTO, MODERN):
+            async with _make_probe(cmd, url) as probe:
+                probe.enable_modern(LATEST_SPEC)
+                disc = await _safe(probe.request("server/discover", {}, timeout=DISCOVER_TIMEOUT))
+                result = disc.get("result") if isinstance(disc, dict) else None
+                info = parse_discover_result(result) if isinstance(result, dict) else None
+                if info is not None:
+                    results = await _run_modern_checks(probe, info)
+                    return ConformanceOutcome(
+                        results, MODERN, info.revision, "server/discover",
+                        info.server_info.get("name"), _tools_of(probe),
+                    )
+                if era == MODERN:
+                    if disc is None:
+                        detail = "server/discover timed out or transport failed"
+                        ctx = await _failure_context(probe)
+                        detail = f"{detail} — {ctx}" if ctx else detail
+                    elif "error" in disc:
+                        detail = f"server/discover returned error: {disc.get('error')}"
+                    else:
+                        detail = (
+                            f"server/discover answered without a mutually supported modern "
+                            f"revision (need {LATEST_SPEC}): {result}"
+                        )
+                    return ConformanceOutcome(
+                        _discover_failed(detail), MODERN, None, "server/discover", None, [],
+                    )
+        # legacy era, on a fresh probe: the discover attempt above must never
+        # colour the session the legacy checks observe
+        async with _make_probe(cmd, url) as probe:
+            results, init_result, tools = await _run_legacy_checks(probe)
+            server_info = init_result.get("serverInfo")
+            return ConformanceOutcome(
+                results, LEGACY,
+                init_result.get("protocolVersion"), "initialize",
+                server_info.get("name") if isinstance(server_info, dict) else None,
+                tools,
+            )
     except Exception as exc:  # server never came up; report instead of raising
-        return _handshake_failed(f"could not start probe: {type(exc).__name__}: {exc}")
+        detail = f"could not start probe: {type(exc).__name__}: {exc}"
+        if era == MODERN:
+            return ConformanceOutcome(_discover_failed(detail), MODERN)
+        return ConformanceOutcome(_handshake_failed(detail), LEGACY)
 
 
-async def _run_checks(probe: RawProbe) -> list[CheckResult]:
+def _tools_of(probe) -> list:
+    return getattr(probe, "mcp_proof_tools", [])
+
+
+# --------------------------------------------------------------------------
+# legacy lane
+# --------------------------------------------------------------------------
+
+
+async def _run_legacy_checks(probe) -> tuple[list[CheckResult], dict, list]:
     init = await _safe(probe.initialize())
     if init is None:
         detail = "initialize timed out or transport failed"
         ctx = await _failure_context(probe)
-        return _handshake_failed(f"{detail} — {ctx}" if ctx else detail)
+        return _handshake_failed(f"{detail} — {ctx}" if ctx else detail), {}, []
     if "result" not in init:
-        return _handshake_failed(f"initialize returned error: {init.get('error')}")
+        return _handshake_failed(f"initialize returned error: {init.get('error')}"), {}, []
 
     results: list[CheckResult] = []
     init_result = init["result"] if isinstance(init["result"], dict) else {}
@@ -202,39 +352,220 @@ async def _run_checks(probe: RawProbe) -> list[CheckResult]:
     else:
         results.append(_res("LIFE-03", FAIL, f"tools/list returned error: {tools_resp.get('error')}"))
 
-    if not tools_served:
+    results.append(await _pagination_check(probe, tools_resp, tools_declared, tools_served))
+    results.extend(await _rpc_checks(probe))
+    results.extend(await _tool_checks(
+        probe, tools, tools_served,
+        skip_reason="tools/list failed" if tools_declared else "no tools surface to check",
+    ))
+    results.append(_hygiene_check(probe))
+    results.append(_cap_check(tools_declared, tools_served, len(tools)))
+
+    probe.mcp_proof_tools = tools  # stashed for the outcome
+    return results, init_result, tools
+
+
+# --------------------------------------------------------------------------
+# modern lane (2026-07-28)
+# --------------------------------------------------------------------------
+
+
+async def _run_modern_checks(probe, info: EraInfo) -> list[CheckResult]:
+    results: list[CheckResult] = []
+
+    identity = info.server_info.get("name") or "no serverInfo in _meta"
+    results.append(_res(
+        "DISC-01", PASS,
+        f"supportedVersions={info.supported_versions}, "
+        f"capabilities: {', '.join(sorted(info.capabilities)) or 'none'}, identity: {identity}",
+    ))
+
+    tools_declared = "tools" in info.capabilities
+
+    tools_resp = await _safe(probe.request("tools/list"))
+    tools_served = tools_resp is not None and "result" in tools_resp
+    tools: list[dict] = []
+    if tools_served:
+        raw = tools_resp["result"].get("tools")
+        tools = raw if isinstance(raw, list) else []
+
+    results.append(await _pagination_check(probe, tools_resp, tools_declared, tools_served))
+    results.extend(await _rpc_checks(probe))
+
+    # negative probe: strip the envelope for one request (rung 1 of the ladder)
+    probe.modern_meta = None
+    bare = await _safe(probe.request("tools/list"))
+    probe.enable_modern(info.revision)
+    if bare is not None and "error" in bare:
         results.append(_res(
-            "LIST-01", SKIP,
-            "tools/list unavailable" if tools_declared else "no tools surface to paginate",
+            "ENV-01", PASS,
+            f"request without _meta envelope rejected (code {bare['error'].get('code')})",
+        ))
+    elif bare is None:
+        results.append(_res("ENV-01", FAIL, "request without _meta envelope got no response"))
+    else:
+        results.append(_res(
+            "ENV-01", FAIL,
+            "request without the _meta protocol envelope was answered as a normal result",
+        ))
+
+    # negative probe: claim a protocol version the server cannot speak (rung 3);
+    # enable_modern keeps envelope and HTTP version header coherent, so this
+    # tests version rejection rather than a header mismatch
+    probe.enable_modern("1999-01-01")
+    wrong = await _safe(probe.request("tools/list"))
+    probe.enable_modern(info.revision)
+    if wrong is not None and "error" in wrong:
+        code = wrong["error"].get("code")
+        if code == UNSUPPORTED_PROTOCOL_VERSION:
+            supported = (wrong["error"].get("data") or {}).get("supported")
+            results.append(_res(
+                "VER-01", PASS,
+                f"version 1999-01-01 rejected with -32022, supported={supported}",
+            ))
+        else:
+            results.append(_res(
+                "VER-01", FAIL,
+                f"unsupported version rejected with code {code}; the spec names -32022 "
+                "(UnsupportedProtocolVersionError)",
+            ))
+    elif wrong is None:
+        results.append(_res("VER-01", FAIL, "request at an unsupported version got no response"))
+    else:
+        results.append(_res("VER-01", FAIL, "request at an unsupported version was answered normally"))
+
+    results.append(await _header_check(probe))
+
+    results.extend(await _tool_checks(
+        probe, tools, tools_served,
+        skip_reason="tools/list failed" if tools_declared else "no tools surface to check",
+    ))
+
+    # deterministic order (SHOULD, 2026-07-28 minor change 3)
+    if not tools_served:
+        results.append(_res("ORD-01", SKIP, "tools/list unavailable"))
+    else:
+        again = await _safe(probe.request("tools/list"))
+        first = [t.get("name") for t in tools if isinstance(t, dict)]
+        if again is None or "result" not in again:
+            results.append(_res("ORD-01", SKIP, "second tools/list call failed"))
+        else:
+            raw = again["result"].get("tools")
+            second = [t.get("name") for t in raw if isinstance(t, dict)] if isinstance(raw, list) else []
+            if first == second:
+                results.append(_res("ORD-01", PASS, f"two calls returned {len(first)} tool(s) in identical order"))
+            else:
+                results.append(_res("ORD-01", WARN, f"tool order differs between calls: {first} vs {second}"))
+
+    # CacheableResult fields (MUST on list results, SEP-2549)
+    if not tools_served:
+        results.append(_res("CACHE-01", SKIP, "tools/list unavailable"))
+    else:
+        listing = tools_resp["result"]
+        ttl = listing.get("ttlMs")
+        scope = listing.get("cacheScope")
+        problems = []
+        if not isinstance(ttl, int | float):
+            problems.append(f"ttlMs missing or non-numeric ({ttl!r})")
+        if scope not in ("public", "private"):
+            problems.append(f'cacheScope missing or invalid ({scope!r}, expected "public"/"private")')
+        if problems:
+            results.append(_res("CACHE-01", FAIL, "; ".join(problems)))
+        else:
+            results.append(_res("CACHE-01", PASS, f"ttlMs={ttl}, cacheScope={scope}"))
+
+    # resultType on every observed result (required at 2026-07-28)
+    observed = getattr(probe, "observed_results", [])
+    missing_rt = [
+        f"{method} ({rt!r})"
+        for method, rt in ((m, r.get("resultType")) for m, r in observed)
+        if rt not in RESULT_TYPES
+    ]
+    if not observed:
+        results.append(_res("RTYPE-01", SKIP, "no results observed"))
+    elif missing_rt:
+        results.append(_res(
+            "RTYPE-01", FAIL,
+            f"{len(missing_rt)}/{len(observed)} results lack a valid resultType: "
+            + ", ".join(missing_rt[:5]),
         ))
     else:
-        cursor = tools_resp["result"].get("nextCursor")
-        if not cursor:
-            results.append(_res("LIST-01", PASS, "single page, no pagination cursor"))
-        else:
-            seen = {cursor}
-            pages = 1
-            verdict = None
-            while cursor:
-                page = await _safe(probe.request("tools/list", {"cursor": cursor}))
-                if page is None or "result" not in page:
-                    verdict = _res("LIST-01", FAIL, f"pagination broke at page {pages + 1}")
-                    break
-                pages += 1
-                cursor = page["result"].get("nextCursor")
-                if cursor in seen:
-                    verdict = _res(
-                        "LIST-01", FAIL,
-                        f"cursor repeats after {pages} pages — clients following it loop forever",
-                    )
-                    break
-                if cursor:
-                    seen.add(cursor)
-                if pages > 20:
-                    verdict = _res("LIST-01", FAIL, "more than 20 pages — suspected unbounded pagination")
-                    break
-            results.append(verdict or _res("LIST-01", PASS, f"pagination terminates after {pages} page(s)"))
+        results.append(_res("RTYPE-01", PASS, f'all {len(observed)} observed results carry resultType'))
 
+    # identity in _meta (SHOULD)
+    carrying = sum(
+        1 for _, r in observed
+        if isinstance(r.get("_meta"), dict) and SERVER_INFO_META_KEY in r["_meta"]
+    )
+    if not observed:
+        results.append(_res("META-01", SKIP, "no results observed"))
+    elif carrying == len(observed):
+        results.append(_res("META-01", PASS, f"all {len(observed)} results carry _meta serverInfo"))
+    elif carrying:
+        results.append(_res("META-01", WARN, f"only {carrying}/{len(observed)} results carry _meta serverInfo"))
+    else:
+        results.append(_res("META-01", WARN, "no result carries io.modelcontextprotocol/serverInfo in _meta"))
+
+    results.append(_hygiene_check(probe))
+    results.append(_cap_check(tools_declared, tools_served, len(tools)))
+
+    probe.mcp_proof_tools = tools
+    return results
+
+
+async def _header_check(probe) -> CheckResult:
+    """HTTP-01: a deliberately mismatched Mcp-Method header must be refused (-32020)."""
+    if getattr(probe, "transport", "stdio") == "stdio":
+        return _res("HTTP-01", SKIP, "routing headers only apply to the Streamable HTTP transport")
+    resp = await _safe(probe.request(
+        "tools/list", header_overrides={"mcp-method": "prompts/list"}
+    ))
+    if resp is not None and "error" in resp:
+        code = resp["error"].get("code")
+        if code == HEADER_MISMATCH:
+            return _res("HTTP-01", PASS, "Mcp-Method mismatch rejected with -32020")
+        return _res("HTTP-01", WARN, f"Mcp-Method mismatch rejected with code {code}, spec names -32020")
+    if resp is None:
+        return _res("HTTP-01", WARN, "Mcp-Method mismatch probe got no response")
+    return _res("HTTP-01", WARN, "server answered normally despite a mismatched Mcp-Method header")
+
+
+# --------------------------------------------------------------------------
+# shared blocks
+# --------------------------------------------------------------------------
+
+
+async def _pagination_check(probe, tools_resp, tools_declared: bool, tools_served: bool) -> CheckResult:
+    if not tools_served:
+        return _res(
+            "LIST-01", SKIP,
+            "tools/list unavailable" if tools_declared else "no tools surface to paginate",
+        )
+    cursor = tools_resp["result"].get("nextCursor")
+    if not cursor:
+        return _res("LIST-01", PASS, "single page, no pagination cursor")
+    seen = {cursor}
+    pages = 1
+    while cursor:
+        page = await _safe(probe.request("tools/list", {"cursor": cursor}))
+        if page is None or "result" not in page:
+            return _res("LIST-01", FAIL, f"pagination broke at page {pages + 1}")
+        pages += 1
+        cursor = page["result"].get("nextCursor")
+        if cursor in seen:
+            return _res(
+                "LIST-01", FAIL,
+                f"cursor repeats after {pages} pages — clients following it loop forever",
+            )
+        if cursor:
+            seen.add(cursor)
+        if pages > 20:
+            return _res("LIST-01", FAIL, "more than 20 pages — suspected unbounded pagination")
+    return _res("LIST-01", PASS, f"pagination terminates after {pages} page(s)")
+
+
+async def _rpc_checks(probe) -> list[CheckResult]:
+    results: list[CheckResult] = []
     unknown = await _safe(probe.request("mcpproof/nonexistent"))
     if unknown is not None and "error" in unknown:
         code = unknown["error"].get("code")
@@ -258,39 +589,34 @@ async def _run_checks(probe: RawProbe) -> list[CheckResult]:
         results.append(_res("RPC-03", FAIL, "malformed tools/call timed out (no response)"))
     else:
         results.append(_res("RPC-03", FAIL, "malformed tools/call params returned a result instead of an error"))
-
-    results.extend(await _tool_checks(
-        probe, tools, tools_served,
-        skip_reason="tools/list failed" if tools_declared else "no tools surface to check",
-    ))
-
-    if getattr(probe, "transport", "stdio") != "stdio":
-        results.append(_res("HYG-01", SKIP, "stdout hygiene only applies to the stdio transport"))
-    else:
-        pollution = probe.non_jsonrpc_stdout
-        if pollution:
-            sample = " | ".join(pollution[:3])
-            results.append(_res("HYG-01", FAIL, f"{len(pollution)} non-JSON-RPC stdout line(s); first 3: {sample}"))
-        else:
-            results.append(_res("HYG-01", PASS, "no non-JSON-RPC stdout lines observed"))
-
-    if tools_declared and tools_served:
-        results.append(_res("CAP-01", PASS, "capabilities.tools declared and tools/list served"))
-    elif not tools_declared and not tools_served:
-        results.append(_res("CAP-01", PASS, "capabilities.tools not declared and tools/list not served"))
-    elif tools_declared:
-        results.append(_res("CAP-01", WARN, "capabilities declare tools but tools/list did not return a result"))
-    else:
-        results.append(_res(
-            "CAP-01", WARN,
-            f"tools/list returned {len(tools)} tool(s) but capabilities do not declare tools",
-        ))
-
     return results
 
 
+def _hygiene_check(probe) -> CheckResult:
+    if getattr(probe, "transport", "stdio") != "stdio":
+        return _res("HYG-01", SKIP, "stdout hygiene only applies to the stdio transport")
+    pollution = probe.non_jsonrpc_stdout
+    if pollution:
+        sample = " | ".join(pollution[:3])
+        return _res("HYG-01", FAIL, f"{len(pollution)} non-JSON-RPC stdout line(s); first 3: {sample}")
+    return _res("HYG-01", PASS, "no non-JSON-RPC stdout lines observed")
+
+
+def _cap_check(tools_declared: bool, tools_served: bool, n_tools: int) -> CheckResult:
+    if tools_declared and tools_served:
+        return _res("CAP-01", PASS, "capabilities.tools declared and tools/list served")
+    if not tools_declared and not tools_served:
+        return _res("CAP-01", PASS, "capabilities.tools not declared and tools/list not served")
+    if tools_declared:
+        return _res("CAP-01", WARN, "capabilities declare tools but tools/list did not return a result")
+    return _res(
+        "CAP-01", WARN,
+        f"tools/list returned {n_tools} tool(s) but capabilities do not declare tools",
+    )
+
+
 async def _tool_checks(
-    probe: RawProbe, tools: list, tools_served: bool, skip_reason: str = "tools/list failed"
+    probe, tools: list, tools_served: bool, skip_reason: str = "tools/list failed"
 ) -> list[CheckResult]:
     if not tools_served:
         return [
@@ -390,7 +716,7 @@ async def _tool_checks(
     return results
 
 
-async def _output_schema_check(probe: RawProbe, tools: list) -> CheckResult:
+async def _output_schema_check(probe, tools: list) -> CheckResult:
     from ..regression.recorder import is_destructive
     from ..regression.sampler import sample_args
 

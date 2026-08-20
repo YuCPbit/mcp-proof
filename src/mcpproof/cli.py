@@ -21,6 +21,11 @@ def main(argv: list[str] | None = None) -> int:
     run_p = sub.add_parser("run", help="Full audit and delivery report")
     run_p.add_argument("server_cmd", nargs="*", help="Command that starts the server (stdio)")
     run_p.add_argument("--url", default=None, help="Audit a running Streamable-HTTP server instead")
+    run_p.add_argument(
+        "--era", choices=["auto", "modern", "legacy"], default="auto",
+        help="Protocol era for the conformance lane: auto probes server/discover "
+             "(2026-07-28) and falls back to the initialize handshake (default: auto)",
+    )
     run_p.add_argument("--out", default="mcp-proof-report.html", help="Report output path")
     run_p.add_argument("--fixtures", default=None, help="Fixtures dir; enables regression lane")
     run_p.add_argument("--server-name", default=None, help="Display name for the report")

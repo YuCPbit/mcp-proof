@@ -17,6 +17,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from . import LATEST_LEGACY_SPEC, __version__
+from .era import modern_envelope
 
 DEFAULT_TIMEOUT = 15.0
 
@@ -31,11 +32,21 @@ class RawProbe:
         self.server_messages: list[dict] = []
         # last N stderr lines: the only diagnostics a crashed server leaves behind
         self.stderr_tail: deque[str] = deque(maxlen=STDERR_TAIL_LINES)
+        # set via enable_modern(): stamped into params._meta on every request
+        self.modern_meta: dict | None = None
+        # (method, result) for every result envelope received — modern-era
+        # checks (resultType, _meta serverInfo) read the session's evidence here
+        self.observed_results: list[tuple[str, dict]] = []
         self._proc: asyncio.subprocess.Process | None = None
         self._pending: dict[int | str, asyncio.Future] = {}
         self._next_id = 0
         self._reader_task: asyncio.Task | None = None
         self._stderr_task: asyncio.Task | None = None
+
+    def enable_modern(self, revision: str) -> None:
+        """Speak the 2026-07-28 era: every subsequent request carries the
+        io.modelcontextprotocol/* envelope in params._meta."""
+        self.modern_meta = modern_envelope(revision, "mcp-proof", __version__)
 
     async def __aenter__(self) -> "RawProbe":
         self._proc = await asyncio.create_subprocess_exec(
@@ -125,14 +136,20 @@ class RawProbe:
         fut: asyncio.Future = asyncio.get_running_loop().create_future()
         self._pending[req_id] = fut
         msg: dict = {"jsonrpc": "2.0", "id": req_id, "method": method}
+        if self.modern_meta is not None and method != "initialize":
+            params = {**(params or {})}
+            params.setdefault("_meta", self.modern_meta)
         if params is not None:
             msg["params"] = params
         try:
             await self._write(msg)
-            return await asyncio.wait_for(fut, timeout or self.timeout)
+            resp = await asyncio.wait_for(fut, timeout or self.timeout)
         except (TimeoutError, asyncio.CancelledError, OSError):
             self._pending.pop(req_id, None)
             return None
+        if isinstance(resp, dict) and isinstance(resp.get("result"), dict):
+            self.observed_results.append((method, resp["result"]))
+        return resp
 
     async def notify(self, method: str, params: dict | None = None) -> None:
         msg: dict = {"jsonrpc": "2.0", "method": method}

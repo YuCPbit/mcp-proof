@@ -79,6 +79,8 @@ def build_report(
     regression: dict | None,
     out_path: str | Path,
     msss: dict | None = None,
+    protocol_era: str = "legacy",
+    discovery: str | None = None,
 ) -> Path:
     """regression: None when the lane didn't run, else
     {"summary": dict from replayer.summarize, "drifts": [DriftResult-like],
@@ -118,6 +120,7 @@ def build_report(
             "tool": {"name": "mcp-proof", "version": __version__},
             "server_cmd": server_cmd,
             "negotiated_protocol": negotiated_protocol,
+            "protocol_era": protocol_era,
             "conformance": conf,
             "security": sec,
             "regression": reg and {
@@ -127,12 +130,21 @@ def build_report(
         }
     )
 
-    if negotiated_protocol == LATEST_LEGACY_SPEC:
-        protocol_note = "newest initialize-handshake revision"
-    elif negotiated_protocol in KNOWN_SPECS:
-        protocol_note = f"newer revision available: {LATEST_LEGACY_SPEC}"
-    else:
+    if protocol_era == "modern":
+        era_label = f"modern era ({discovery or 'server/discover'})"
         protocol_note = ""
+        spec_reference = negotiated_protocol or LATEST_LEGACY_SPEC
+        protocol_verb = "selected"
+    else:
+        era_label = "initialize-handshake era"
+        spec_reference = LATEST_LEGACY_SPEC
+        protocol_verb = "negotiated"
+        if negotiated_protocol == LATEST_LEGACY_SPEC:
+            protocol_note = "newest initialize-handshake revision"
+        elif negotiated_protocol in KNOWN_SPECS:
+            protocol_note = f"newer revision available: {LATEST_LEGACY_SPEC}"
+        else:
+            protocol_note = ""
 
     env = Environment(
         loader=FileSystemLoader(_TEMPLATE_DIR),
@@ -145,7 +157,9 @@ def build_report(
         tool_version=__version__,
         negotiated_protocol=negotiated_protocol or "unknown",
         protocol_note=protocol_note,
-        latest_legacy_spec=LATEST_LEGACY_SPEC,
+        protocol_verb=protocol_verb,
+        era_label=era_label,
+        spec_reference=spec_reference,
         run_hash=run_hash,
         conformance=conf,
         must_ok=must_ok,

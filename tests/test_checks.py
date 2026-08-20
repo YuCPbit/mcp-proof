@@ -16,7 +16,7 @@ BAD_SERVER_EXPECTED_FAILS = {
 
 
 async def test_good_server_conformance(good_server_cmd):
-    results = await run_conformance(good_server_cmd)
+    results = (await run_conformance(good_server_cmd)).results
     by_id = {r.id: r for r in results}
 
     must_not_pass = [
@@ -39,7 +39,7 @@ async def test_good_server_security(good_server_cmd):
 
 
 async def test_bad_server_expected_failures(bad_server_cmd):
-    conformance = await run_conformance(bad_server_cmd)
+    conformance = (await run_conformance(bad_server_cmd)).results
     tools = await fetch_tools(bad_server_cmd)
     results = conformance + run_security(tools)
 
@@ -58,6 +58,6 @@ async def test_list01_catches_cursor_loop():
     from _paths import venv_python
 
     cmd = [venv_python(), str(Path(__file__).resolve().parent / "cursor_loop_server.py")]
-    results = {r.id: r for r in await run_conformance(cmd)}
+    results = {r.id: r for r in (await run_conformance(cmd)).results}
     assert results["LIST-01"].status == "FAIL"
     assert "loop" in results["LIST-01"].evidence.lower() or "repeats" in results["LIST-01"].evidence

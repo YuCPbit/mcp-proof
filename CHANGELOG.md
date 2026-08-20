@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0.dev (on main)
+
+Dual-era protocol support: the conformance lane now speaks both the 2026-07-28 modern era and
+the legacy initialize handshake.
+
+- **Era auto-detection** (`--era auto|modern|legacy`): `server/discover` is probed first, exactly
+  like the official client's auto mode; anything that is not positive modern evidence falls back
+  to the handshake — on a fresh probe, so the audited session is never perturbed by negotiation.
+- **19 modern-era checks**, including three negative probes with teeth: requests without the
+  `_meta` envelope must be rejected (ENV-01), an unsupported protocol version must return
+  `-32022` with the supported list (VER-01), and a mismatched `Mcp-Method` routing header must
+  return `-32020` over Streamable HTTP (HTTP-01). Plus `resultType` on every result (RTYPE-01),
+  `ttlMs`/`cacheScope` on list results (CACHE-01), `_meta` serverInfo identity (META-01), and
+  deterministic tool order (ORD-01). The 12 shared RPC/TOOL/LIST/HYG/CAP checks run in both eras.
+- **Dual-era test targets**: a hand-rolled, zero-dependency modern server (stdio + Streamable
+  HTTP, with planted-violation flags) — hand-rolled because the 1.x and 2.x client SDKs cannot
+  share a venv. Its wire format is cross-validated against the official v2 SDK in both
+  directions (`scripts/crosscheck_modern_server.py`): the official client adopts it via
+  `server/discover`, and mcp-proof audits an official v2 SDK server fully green.
+- Report header and fingerprint now carry the protocol era and discovery method.
+- Modern-only servers: the regression lane (which rides the legacy client SDK) reports itself
+  skipped instead of crashing; the SDK-side migration is the remaining v0.3 work.
+
 ## 0.2.1 — 2026-08-21
 
 Truth patch: every README claim is now backed by code, and a fresh install works again.

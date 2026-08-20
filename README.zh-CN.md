@@ -8,7 +8,7 @@
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
-[![checks](https://img.shields.io/badge/checks-15_conformance_·_6_security-6a5acd)](src/mcpproof/checks/)
+[![checks](https://img.shields.io/badge/checks-19_modern_·_15_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
 [![transports](https://img.shields.io/badge/transports-stdio_·_HTTP-informational)](src/mcpproof/client_http.py)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
@@ -24,7 +24,7 @@
 
 ## ✨ 你得到什么
 
-- 🔍 **15 项线级协议检查** —— mcp-proof 直接对服务器说原始 JSON-RPC，验证的是真正走线的内容：握手完整性、精确错误码、工具 schema 合法性、结构化输出正确性、stdout 卫生、分页安全，以及协议版本如实上报。能力感知：只提供 resources 或 prompts 的服务器绝不会因为没有 tools 而被判失败。
+- 🔍 **覆盖两个协议时代的线级检查** —— mcp-proof 直接对服务器说原始 JSON-RPC 并自动识别其时代：2026-07-28 现代时代 19 项（`server/discover`、`_meta` envelope 强制、`resultType`、`ttlMs`/`cacheScope`、-32022 版本拒绝、HTTP 路由 header 强制），initialize 握手时代 15 项——精确错误码、工具 schema、结构化输出、stdout 卫生、分页安全。能力感知：只提供 resources 或 prompts 的服务器绝不会因为没有 tools 而被判失败。
 - 🛡️ **挂靠公开标准的安全审计** —— 6 项确定性检查（工具描述投毒、隐形/双向字符、凭据泄漏、无约束注入面、暴露任意执行），每项映射到 24 控制项的 [MCP Server Security Standard](https://mcp-security-standard.org) 的规范控制 ID，每份报告内置完整合规表。
 - 📼 **留给客户的回归套件** —— 带 SHA-256 溯源的黄金 fixtures 冻结服务器行为；重放按严重度给漂移分级（`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`），理解结构化输出，保持有状态调用顺序，并附带可直接粘贴的 GitHub Actions 门禁。
 - 📄 **非工程师也能读的报告** —— 判定横幅、分数卡、逐项证据与修复建议、MSSS 合规表，以及按优先级排序的**下一步行动清单**。自包含 HTML；加 `--pdf` 直接出 PDF。
@@ -77,8 +77,11 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | | |
 |---|---|
 | 传输层 | stdio ✅ · Streamable HTTP ✅ |
-| 协议版本 | initialize 握手时代的全部版本，`2024-11-05` → `2025-11-25` ✅ |
-| `2026-07-28` 现代时代（`server/discover`） | v0.3——见路线图 |
+| 现代时代 `2026-07-28`（`server/discover`、无状态 `_meta`） | ✅ 一致性车道，自动识别——`--era auto\|modern\|legacy` |
+| Legacy 时代（initialize 握手，`2024-11-05` → `2025-11-25`） | ✅ 全部车道 |
+| 回归车道 vs 纯现代服务器 | 随客户端 SDK 迁移——v0.3 后续增量 |
+
+现代车道与官方 v2 SDK **双向互验**：官方客户端通过 `server/discover` 接纳 mcp-proof 手写的现代测试服务器，mcp-proof 审计官方 v2 SDK 服务器全绿（`scripts/crosscheck_modern_server.py`）。
 
 支持**任何语言**编写的服务器——mcp-proof 对话的是进程（或 URL），不是你的代码库。
 
@@ -98,7 +101,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 | 版本 | 主线 |
 |---|---|
-| v0.3 | 双时代协议支持——`server/discover` + `_meta`（2026-07-28 现代时代）与 legacy 握手并存，`--era auto\|modern\|legacy` |
+| v0.3 | 双时代协议支持——一致性车道 ✅ 已落地 main（自动识别、19 项现代检查、双时代测试服务器）。剩余：基于 2.x 客户端 SDK 的现代回归录制 |
 | v0.4 | 能力感知的 resources / prompts 车道 · 契约清单 `inspect` / `diff` / `assert-no-breaking` |
 | v0.5 | JSON / JUnit / SARIF 输出 · 可复用的 GitHub Action |
 | v0.6 | Schema 驱动的边界与负向测试生成 |

@@ -135,7 +135,7 @@ def test_evaluate_msss_skipped_checks_degrade_to_manual():
 
 
 async def test_bad_server_live_msss_gaps(bad_server_cmd):
-    conformance = await run_conformance(bad_server_cmd)
+    conformance = (await run_conformance(bad_server_cmd)).results
     tools = await fetch_tools(bad_server_cmd)
     msss = evaluate_msss(conformance + run_security(tools))
     by_id = {c["id"]: c for c in msss["controls"]}

@@ -8,7 +8,7 @@
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
-[![checks](https://img.shields.io/badge/checks-15_conformance_·_6_security-6a5acd)](src/mcpproof/checks/)
+[![checks](https://img.shields.io/badge/checks-19_modern_·_15_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
 [![transports](https://img.shields.io/badge/transports-stdio_·_HTTP-informational)](src/mcpproof/client_http.py)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
@@ -24,7 +24,7 @@
 
 ## ✨ What you get
 
-- 🔍 **15 wire-level protocol checks** — mcp-proof speaks raw JSON-RPC to your server, so it verifies what actually crosses the wire: handshake completeness, exact error codes, tool-schema validity, structured-output correctness, stdout hygiene, pagination safety, and protocol-revision reporting. Capability-aware: a resources- or prompts-only server is never failed for lacking tools.
+- 🔍 **Wire-level protocol checks for both protocol eras** — mcp-proof speaks raw JSON-RPC to your server and auto-detects its era: 19 checks for the 2026-07-28 modern era (`server/discover`, `_meta` envelope enforcement, `resultType`, `ttlMs`/`cacheScope`, `-32022` version rejection, HTTP routing-header enforcement) and 15 for the initialize-handshake era — exact error codes, tool-schema validity, structured output, stdout hygiene, pagination safety. Capability-aware: a resources- or prompts-only server is never failed for lacking tools.
 - 🛡️ **Security audit tied to a public standard** — 6 deterministic checks (tool-description poisoning, invisible/bidi characters, leaked credentials, unconstrained injection surfaces, advertised shell execution), each mapped to canonical control IDs of the 24-control [MCP Server Security Standard](https://mcp-security-standard.org), rendered as a full compliance table in every report.
 - 📼 **A regression suite your client keeps** — golden fixtures with SHA-256 provenance freeze the server's behaviour; replay grades every drift (`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`), understands structured output, preserves stateful call order, and ships with a ready-to-paste GitHub Actions gate.
 - 📄 **A report non-engineers can read** — verdict banner, score tiles, per-finding evidence and fixes, MSSS table, and a priority-ordered **Recommended next steps** list. Self-contained HTML; add `--pdf` for a PDF.
@@ -77,8 +77,13 @@ Every lane feeds one report — and the report ends with a prioritized fix list,
 | | |
 |---|---|
 | Transports | stdio ✅ · Streamable HTTP ✅ |
-| Protocol revisions | every initialize-handshake revision, `2024-11-05` → `2025-11-25` ✅ |
-| `2026-07-28` modern era (`server/discover`) | v0.3 — see the roadmap |
+| Modern era `2026-07-28` (`server/discover`, stateless `_meta`) | ✅ conformance lane, auto-detected — `--era auto\|modern\|legacy` |
+| Legacy era (initialize handshake, `2024-11-05` → `2025-11-25`) | ✅ all lanes |
+| Regression lane against modern-only servers | migrates with the client SDK — later v0.3 increment |
+
+The modern lane is validated against the official v2 SDK **in both directions**: the official client
+adopts mcp-proof's hand-rolled modern test server via `server/discover`, and mcp-proof audits an
+official v2 SDK server fully green (`scripts/crosscheck_modern_server.py`).
 
 Works with servers in **any language** — mcp-proof talks to the process (or URL), not to your codebase.
 
@@ -98,7 +103,7 @@ Building a server rather than auditing one? [`templates/server-starter/`](templa
 
 | Release | Focus |
 |---|---|
-| v0.3 | Dual-era protocol support — `server/discover` + `_meta` (2026-07-28 modern era) alongside the legacy handshake, `--era auto\|modern\|legacy` |
+| v0.3 | Dual-era protocol support — conformance lane ✅ landed on main (auto-detection, 19 modern checks, dual-era test servers). Remaining: modern-era recorder via the 2.x client SDK |
 | v0.4 | Capability-aware resources & prompts lanes · contract manifest `inspect` / `diff` / `assert-no-breaking` |
 | v0.5 | JSON / JUnit / SARIF outputs · reusable GitHub Action |
 | v0.6 | Schema-driven boundary & negative test generation |

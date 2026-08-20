@@ -95,7 +95,7 @@ async def test_v2_fixtures_still_replay(tmp_path):
 
 async def test_resources_only_server_is_not_failed():
     """A server whose capabilities hold no tools is spec-legal, not broken."""
-    results = await run_conformance([PYTHON, str(HERE / "resources_only_server.py")])
+    results = (await run_conformance([PYTHON, str(HERE / "resources_only_server.py")])).results
     by_id = {r.id: r for r in results}
     must_fails = [(r.id, r.evidence) for r in results if r.level == MUST and r.status == FAIL]
     assert not must_fails, must_fails
@@ -107,7 +107,7 @@ async def test_resources_only_server_is_not_failed():
 
 
 async def test_crashed_server_reports_exit_code_and_stderr():
-    results = await run_conformance([PYTHON, str(HERE / "crashing_server.py")])
+    results = (await run_conformance([PYTHON, str(HERE / "crashing_server.py")])).results
     life01 = {r.id: r for r in results}["LIFE-01"]
     assert life01.status == FAIL
     assert "exited with code 1" in life01.evidence, life01.evidence
