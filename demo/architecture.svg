@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <rect width="1200" height="630" fill="#f9f9f7"/>
+
+  <!-- title -->
+  <text x="60" y="64" font-size="30" font-weight="700" fill="#0b0b0b">mcp-proof</text>
+  <text x="238" y="64" font-size="16" fill="#898781" letter-spacing="1.5">SHIP AN MCP SERVER WITH A RECEIPT</text>
+
+  <!-- server under test -->
+  <g>
+    <rect x="60" y="150" width="215" height="330" rx="12" fill="#fcfcfb" stroke="#0b0b0b" stroke-opacity="0.1"/>
+    <text x="167" y="196" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">MCP server</text>
+    <text x="167" y="220" font-size="12.5" fill="#52514e" text-anchor="middle">under test</text>
+    <rect x="84" y="252" width="167" height="34" rx="8" fill="#f0f4fa" stroke="#2a78d6" stroke-opacity="0.5"/>
+    <text x="167" y="274" font-size="12.5" fill="#1c5cab" text-anchor="middle" font-family="ui-monospace, Menlo, monospace">stdio subprocess</text>
+    <rect x="84" y="296" width="167" height="34" rx="8" fill="#f0f4fa" stroke="#2a78d6" stroke-opacity="0.5"/>
+    <text x="167" y="318" font-size="12.5" fill="#1c5cab" text-anchor="middle" font-family="ui-monospace, Menlo, monospace">--url  (HTTP)</text>
+    <text x="167" y="382" font-size="12" fill="#898781" text-anchor="middle">raw JSON-RPC probe —</text>
+    <text x="167" y="400" font-size="12" fill="#898781" text-anchor="middle">sees the wire defects</text>
+    <text x="167" y="418" font-size="12" fill="#898781" text-anchor="middle">SDKs normalize away</text>
+  </g>
+
+  <!-- arrow 1 -->
+  <path d="M 285 315 L 330 315" stroke="#c3c2b7" stroke-width="2.5" fill="none"/>
+  <path d="M 330 315 l -9 -5.5 v 11 z" fill="#c3c2b7"/>
+
+  <!-- four lanes -->
+  <g>
+    <rect x="345" y="110" width="360" height="410" rx="12" fill="#fcfcfb" stroke="#0b0b0b" stroke-opacity="0.1"/>
+    <text x="525" y="146" font-size="15" font-weight="650" fill="#0b0b0b" text-anchor="middle">four deterministic lanes</text>
+
+    <rect x="369" y="170" width="312" height="72" rx="9" fill="#f9f9f7" stroke="#0ca30c" stroke-width="1.4"/>
+    <text x="387" y="199" font-size="13.5" font-weight="650" fill="#0b0b0b">① Conformance</text>
+    <text x="387" y="221" font-size="12" fill="#52514e">15 protocol checks · MUST / SHOULD graded</text>
+
+    <rect x="369" y="254" width="312" height="72" rx="9" fill="#f9f9f7" stroke="#0ca30c" stroke-width="1.4"/>
+    <text x="387" y="283" font-size="13.5" font-weight="650" fill="#0b0b0b">② Security &amp; hygiene</text>
+    <text x="387" y="305" font-size="12" fill="#52514e">poisoning · secrets · injection → MSSS controls</text>
+
+    <rect x="369" y="338" width="312" height="72" rx="9" fill="#f9f9f7" stroke="#0ca30c" stroke-width="1.4"/>
+    <text x="387" y="367" font-size="13.5" font-weight="650" fill="#0b0b0b">③ Behaviour regression</text>
+    <text x="387" y="389" font-size="12" fill="#52514e">record / replay · SHA-256 fixtures · drift grading</text>
+
+    <rect x="369" y="422" width="312" height="72" rx="9" fill="#f9f9f7" stroke="#c3c2b7" stroke-dasharray="5 4"/>
+    <text x="387" y="451" font-size="13.5" font-weight="650" fill="#898781">④ Semantic (LLM)</text>
+    <text x="387" y="473" font-size="12" fill="#898781">opt-in only — default lanes burn zero tokens</text>
+  </g>
+
+  <!-- arrow 2 -->
+  <path d="M 715 315 L 760 315" stroke="#c3c2b7" stroke-width="2.5" fill="none"/>
+  <path d="M 760 315 l -9 -5.5 v 11 z" fill="#c3c2b7"/>
+
+  <!-- outputs -->
+  <g>
+    <rect x="775" y="110" width="365" height="240" rx="12" fill="#fcfcfb" stroke="#0ca30c" stroke-width="1.6"/>
+    <text x="799" y="150" font-size="15" font-weight="650" fill="#0b0b0b">Delivery report</text>
+    <text x="799" y="176" font-size="12.5" fill="#52514e">client-readable HTML + PDF</text>
+    <text x="799" y="205" font-size="12.5" fill="#52514e">✓ SHIP-READY verdict + score tiles</text>
+    <text x="799" y="228" font-size="12.5" fill="#52514e">✓ findings with evidence &amp; fix hints</text>
+    <text x="799" y="251" font-size="12.5" fill="#52514e">✓ 24-control MSSS compliance table</text>
+    <text x="799" y="274" font-size="12.5" fill="#52514e">✓ prioritized next steps (P0 / P1)</text>
+    <text x="799" y="303" font-size="12" fill="#898781" font-family="ui-monospace, Menlo, monospace">sha256 fingerprint — same behaviour,</text>
+    <text x="799" y="321" font-size="12" fill="#898781" font-family="ui-monospace, Menlo, monospace">same hash, provably reproducible</text>
+
+    <rect x="775" y="372" width="365" height="148" rx="12" fill="#fcfcfb" stroke="#0b0b0b" stroke-opacity="0.1"/>
+    <text x="799" y="410" font-size="15" font-weight="650" fill="#0b0b0b">Leave-behind CI suite</text>
+    <text x="799" y="436" font-size="12.5" fill="#52514e">golden fixtures = the behavioural contract,</text>
+    <text x="799" y="458" font-size="12.5" fill="#52514e">plus a paste-ready GitHub Actions gate —</text>
+    <text x="799" y="480" font-size="12.5" fill="#52514e">drift fails the client's build after you're gone</text>
+  </g>
+
+  <!-- footer strip -->
+  <text x="600" y="586" font-size="13.5" fill="#52514e" text-anchor="middle">deterministic · zero LLM tokens · reproducible by construction · validated against the official filesystem server</text>
+</svg>

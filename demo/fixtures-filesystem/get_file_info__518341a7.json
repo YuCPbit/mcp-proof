@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "tool": "get_file_info",
+  "case": "empty-string",
+  "args": {
+    "path": ""
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "size: 64\ncreated: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nmodified: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\naccessed: Thu Aug 20 2026 19:34:08 GMT+0800 (China Standard Time)\nisDirectory: true\nisFile: false\npermissions: 755"
+      }
+    ]
+  },
+  "response_sha256": "c2282ef34d0e8d09ff346a6c7d76a9a0881c041b769bf26ef74bd3b6afc5ac54",
+  "latency_ms": 3,
+  "recorded_at": "2026-08-20T11:56:17.691563+00:00",
+  "server_cmd": [
+    "npx",
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "/tmp/mcp-proof-sandbox"
+  ]
+}

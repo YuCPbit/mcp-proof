@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "tool": "calc_sum",
+  "args": {
+    "numbers": [
+      1.5
+    ]
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "1.5"
+      }
+    ]
+  },
+  "response_sha256": "d92d12fe1fa49b55a976d49e65cf158c2d6ad768e11f309e6cdb085fd081cd15",
+  "latency_ms": 2,
+  "recorded_at": "2026-08-18T04:24:45.179873+00:00",
+  "server_cmd": [
+    ".venv/bin/python",
+    "demo/good_server.py"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "tool": "directory_tree",
+  "case": "empty-string",
+  "args": {
+    "path": ""
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "[]"
+      }
+    ]
+  },
+  "response_sha256": "45afa0cad7c14a8e2df73e22ba15d3e8b64033ac7133b6c8c352a528058b05f4",
+  "latency_ms": 0,
+  "recorded_at": "2026-08-20T11:56:17.681960+00:00",
+  "server_cmd": [
+    "npx",
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "/tmp/mcp-proof-sandbox"
+  ]
+}

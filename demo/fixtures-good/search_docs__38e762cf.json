@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "tool": "search_docs",
+  "args": {
+    "query": "example"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "Refund window is 30 days from purchase; see policy section 4.2."
+      }
+    ]
+  },
+  "response_sha256": "06b57fe8c85a7f3631aded808d4082f5475521ea26b42f9689b5f57f870bc5aa",
+  "latency_ms": 2,
+  "recorded_at": "2026-08-18T04:24:45.182304+00:00",
+  "server_cmd": [
+    ".venv/bin/python",
+    "demo/good_server.py"
+  ]
+}

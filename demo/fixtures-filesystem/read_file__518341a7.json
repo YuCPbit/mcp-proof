@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "tool": "read_file",
+  "case": "empty-string",
+  "args": {
+    "path": ""
+  },
+  "response": {
+    "is_error": true,
+    "content": [
+      {
+        "type": "text",
+        "text": "EISDIR: illegal operation on a directory, read"
+      }
+    ]
+  },
+  "response_sha256": "a2895bec8c819993402029ef1cfc001ea84b46f38565f7426c68820986ce972d",
+  "latency_ms": 0,
+  "recorded_at": "2026-08-20T11:56:17.664703+00:00",
+  "server_cmd": [
+    "npx",
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "/tmp/mcp-proof-sandbox"
+  ]
+}

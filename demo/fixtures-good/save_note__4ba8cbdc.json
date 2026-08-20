@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "tool": "save_note",
+  "args": {
+    "title": "example",
+    "text": "example"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "Saved note 'example' (7 chars)."
+      }
+    ]
+  },
+  "response_sha256": "92c004f76c10e0f5f95034915b53e222eca94c57611b88fa95c45dac1e4804a2",
+  "latency_ms": 2,
+  "recorded_at": "2026-08-18T04:24:45.174289+00:00",
+  "server_cmd": [
+    ".venv/bin/python",
+    "demo/good_server.py"
+  ]
+}

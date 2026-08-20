@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "tool": "search_files",
+  "case": "empty-string",
+  "args": {
+    "path": "",
+    "pattern": "example"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "No matches found"
+      }
+    ]
+  },
+  "response_sha256": "93d54eb7ccc0aec036dda9c5734a44f64ebfa5ac8e2bc10eb98da31414191e5d",
+  "latency_ms": 0,
+  "recorded_at": "2026-08-20T11:56:17.684235+00:00",
+  "server_cmd": [
+    "npx",
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "/tmp/mcp-proof-sandbox"
+  ]
+}

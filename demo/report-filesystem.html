@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@modelcontextprotocol/server-filesystem (official) — MCP Delivery Report</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --card: #fcfcfb;
+    --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #898781;
+    --hairline: #e1e0d9; --ring: rgba(11,11,11,.10);
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+    --good-text: #006300; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 64px; }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .brand .mark { font-weight: 700; letter-spacing: -.01em; }
+  .brand .doc { color: var(--ink-3); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+  h1 { margin: 0 0 14px; font-size: 28px; letter-spacing: -.02em; }
+  h2 { margin: 40px 0 12px; font-size: 17px; letter-spacing: -.01em; }
+  .verdict { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 8px;
+             font-weight: 650; font-size: 14px; border: 1px solid; margin-bottom: 22px; }
+  .verdict.pass { color: var(--good-text); border-color: var(--good); background: rgba(12,163,12,.08); }
+  .verdict.fail { color: var(--critical); border-color: var(--critical); background: rgba(208,59,59,.07); }
+  .verdict .why { font-weight: 400; color: var(--ink-2); }
+  .meta { display: grid; grid-template-columns: 150px 1fr; gap: 4px 16px; font-size: 13px;
+          background: var(--card); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; }
+  .meta dt { color: var(--ink-3); } .meta dd { margin: 0; word-break: break-all; }
+  .meta .mono { font-family: var(--mono); font-size: 12px; }
+  .note-warn { color: var(--ink-2); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile { background: var(--card); border: 1px solid var(--ring); border-top: 3px solid var(--tile-accent, var(--hairline));
+          border-radius: 10px; padding: 14px 16px 12px; }
+  .tile .k { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); }
+  .tile .v { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 2px 0 0; }
+  .tile .s { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--ring);
+          border-radius: 10px; overflow: hidden; font-size: 13.5px; }
+  th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em;
+       color: var(--ink-3); font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--hairline); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+  td.level { color: var(--ink-3); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .title { font-weight: 550; }
+  .evidence { color: var(--ink-2); font-size: 12.5px; margin-top: 2px; word-break: break-word; }
+  .fix { color: var(--ink-3); font-size: 12.5px; margin-top: 2px; }
+  .fix b { color: var(--ink-2); font-weight: 600; }
+  .msss-lead { font-size: 13.5px; color: var(--ink-2); margin: 0 0 12px; }
+  .msss-lead b { color: var(--ink); }
+  .attrib { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px;
+           font-size: 12px; font-weight: 650; border: 1px solid; white-space: nowrap; color: var(--ink); }
+  .badge.pass   { border-color: var(--good);     background: rgba(12,163,12,.10); }
+  .badge.fail   { border-color: var(--critical); background: rgba(208,59,59,.10); }
+  .badge.warn   { border-color: var(--warning);  background: rgba(250,178,25,.14); }
+  .badge.skip   { border-color: var(--hairline); background: transparent; color: var(--ink-3); }
+  .badge.breaking { border-color: var(--critical); background: rgba(208,59,59,.10); }
+  .badge.error    { border-color: var(--critical); background: rgba(208,59,59,.10); }
+  .badge.value    { border-color: var(--serious);  background: rgba(236,131,90,.13); }
+  .badge.latency  { border-color: var(--warning);  background: rgba(250,178,25,.14); }
+  .badge.cosmetic { border-color: var(--hairline); background: transparent; color: var(--ink-2); }
+  .badge.ok       { border-color: var(--good);     background: rgba(12,163,12,.10); }
+  pre { background: var(--card); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px;
+        font-family: var(--mono); font-size: 12px; line-height: 1.55; overflow-x: auto; }
+  ol.steps { margin: 0; padding: 4px 0 0 0; list-style: none; }
+  ol.steps li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0;
+                border-bottom: 1px solid var(--hairline); font-size: 13.5px; }
+  ol.steps li:last-child { border-bottom: 0; }
+  .prio { flex: none; display: inline-block; min-width: 38px; text-align: center; padding: 1px 8px;
+          border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid; }
+  .prio.p0   { border-color: var(--critical); background: rgba(208,59,59,.10); }
+  .prio.p1   { border-color: var(--warning);  background: rgba(250,178,25,.14); }
+  .prio.keep { border-color: var(--good);     background: rgba(12,163,12,.10); }
+  .leave p { font-size: 13.5px; color: var(--ink-2); }
+  footer { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--hairline);
+           font-size: 12px; color: var(--ink-3); }
+  footer .mono { font-family: var(--mono); word-break: break-all; }
+  @media print {
+    body { background: #fff; } .wrap { padding: 0; max-width: none; }
+    tr, .tile { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand"><span class="mark">mcp-proof</span><span class="doc">Delivery report</span></div>
+  <h1>@modelcontextprotocol/server-filesystem (official)</h1>
+
+  
+  <div class="verdict pass">✓ SHIP-READY <span class="why">— all MUST checks pass, no security findings, no behavioural drift</span></div>
+  
+
+  <dl class="meta">
+    <dt>Server under test</dt><dd class="mono">npx -y @modelcontextprotocol/server-filesystem /tmp/mcp-proof-sandbox</dd>
+    <dt>Generated</dt><dd>2026-08-20 15:21 UTC · mcp-proof v0.2.0</dd>
+    <dt>Protocol</dt><dd>negotiated <span class="mono">2025-11-25</span>
+       · <span class="note-warn">latest spec is 2026-07-28 — migration recommended</span></dd>
+    <dt>Run fingerprint</dt><dd class="mono">sha256:b01888e9b1e702b033048412a30239a105107b08e534bdbb50d40ab8a51a7601</dd>
+  </dl>
+
+  <div class="tiles">
+    <div class="tile" style="--tile-accent: var(--good)">
+      <div class="k">Conformance</div>
+      <div class="v">11/11</div>
+      <div class="s">MUST checks passed · 4/4 SHOULD</div>
+    </div>
+    <div class="tile" style="--tile-accent: var(--good)">
+      <div class="k">Security</div>
+      <div class="v">1</div>
+      <div class="s">finding · 0 blocking · 1 advisory</div>
+    </div>
+    <div class="tile" style="--tile-accent: var(--good)">
+      <div class="k">Behaviour regression</div>
+      
+      <div class="v">34/34</div>
+      <div class="s">replays clean · gate PASS</div>
+      
+    </div>
+  </div>
+
+  
+
+  <h2>Protocol conformance</h2>
+  <table>
+    <thead><tr><th>Check</th><th>Level</th><th>Result</th><th>Details</th></tr></thead>
+    <tbody>
+    
+      <tr>
+        <td class="id">LIFE-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">initialize returns protocolVersion, capabilities and serverInfo</div>
+          <div class="evidence">protocolVersion, capabilities and serverInfo all present</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">LIFE-02</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge warn">! WARN</span></td>
+        <td>
+          <div class="title">server negotiates the latest spec revision (2026-07-28)</div>
+          <div class="evidence">requested 2026-07-28, negotiated 2025-11-25 — server not yet migrated to the 2026-07-28 spec revision</div>
+          <div class="fix"><b>Fix:</b> Upgrade the server SDK to a release that speaks the 2026-07-28 spec revision.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">LIFE-03</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">server answers tools/list after the initialized notification</div>
+          <div class="evidence">tools/list returned 14 tool(s) after initialized</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">LIST-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">tools/list pagination terminates (no cursor loop)</div>
+          <div class="evidence">single page, no pagination cursor</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">RPC-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">unknown method gets a JSON-RPC error response</div>
+          <div class="evidence">unknown method rejected with error code -32601</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">RPC-02</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">unknown method error code is -32601 (method not found)</div>
+          <div class="evidence">expected -32601, got -32601</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">RPC-03</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">malformed tools/call params are rejected with an error</div>
+          <div class="evidence">malformed params rejected with error code -32603</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">TOOL-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">every tool has a non-empty name and an inputSchema</div>
+          <div class="evidence">all 14 tools have a name and an inputSchema</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">TOOL-02</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">every tool has a non-empty description</div>
+          <div class="evidence">all 14 tools carry a description</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">TOOL-03</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">every tool inputSchema compiles as JSON Schema</div>
+          <div class="evidence">all 14 inputSchemas compile as JSON Schema draft 2020-12</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">TOOL-04</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">calling a nonexistent tool is rejected</div>
+          <div class="evidence">rejected as tool result with isError=true</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">TOOL-05</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">a call missing required arguments is rejected</div>
+          <div class="evidence">read_file with empty args rejected via isError=true</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">TOOL-06</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">declared outputSchemas compile and structured results match them</div>
+          <div class="evidence">all 14 outputSchema(s) compile; dynamic call to read_file did not yield a normal result, structured output unverified</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">HYG-01</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">stdout carries only JSON-RPC messages</div>
+          <div class="evidence">no non-JSON-RPC stdout lines observed</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">CAP-01</td>
+        <td class="level">SHOULD</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">declared capabilities match served features (tools)</div>
+          <div class="evidence">capabilities.tools declared and tools/list served</div>
+          
+        </td>
+      </tr>
+    
+    </tbody>
+  </table>
+
+  <h2>Security &amp; hygiene</h2>
+  <table>
+    <thead><tr><th>Check</th><th>Domain</th><th>Result</th><th>Details</th></tr></thead>
+    <tbody>
+    
+      <tr>
+        <td class="id">SEC-01</td>
+        <td class="level">MCP-INPUT-01</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">no prompt-injection patterns in tool descriptions</div>
+          <div class="evidence">0 matches across 14 tools</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">SEC-02</td>
+        <td class="level">MCP-INPUT-01</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">no invisible or bidi control characters in tool metadata</div>
+          <div class="evidence">0 invisible characters across 14 tools</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">SEC-03</td>
+        <td class="level">MCP-LOG-02</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">no secret-looking strings in tool metadata</div>
+          <div class="evidence">0 secret-like strings across 14 tools</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">SEC-04</td>
+        <td class="level">MCP-INPUT-02</td>
+        <td><span class="badge warn">! WARN</span></td>
+        <td>
+          <div class="title">injection-surface string params carry constraints</div>
+          <div class="evidence">unconstrained injection-surface params: read_file.path, read_text_file.path, read_media_file.path, write_file.path, edit_file.path, create_directory.path, list_directory.path, list_directory_with_sizes.path, directory_tree.path, search_files.path, get_file_info.path</div>
+          <div class="fix"><b>Fix:</b> Add enum, pattern or maxLength to path/url/command-like string params.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">SEC-05</td>
+        <td class="level">MCP-INPUT-01</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">tool descriptions stay under 2000 chars</div>
+          <div class="evidence">longest description 457 chars across 14 tools</div>
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">SEC-06</td>
+        <td class="level">MCP-EXEC-01,MCP-EXEC-02</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">no tool advertises unconstrained arbitrary execution</div>
+          <div class="evidence">0 exec-style tools with free-form params across 14 tools</div>
+          
+        </td>
+      </tr>
+    
+    </tbody>
+  </table>
+
+  <h2>MSSS compliance</h2>
+  <p class="msss-lead"><b>L1: 2/2 auto-assessable controls met · 4 require manual review.</b>
+     Mapped against MSSS v0.1 (control-level mapping v2.0 (2026-01-20)): 3 of
+     24 controls are auto-assessable from this audit's deterministic checks; the remaining
+     21 need deployment, code or process evidence and are marked manual review — never assessed
+     by this tool.</p>
+  <table>
+    <thead><tr><th>Control</th><th>Domain</th><th>Level</th><th>Result</th><th>Title</th></tr></thead>
+    <tbody>
+    
+      <tr>
+        <td class="id">MCP-EXEC-01</td>
+        <td class="level">Execution</td>
+        <td class="level">L1</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Prohibition of Shell Execution</div>
+          
+          
+          <div class="fix">SEC-06 flags advertised arbitrary-exec tools, but proving the absence of shell invocation requires source review.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-FS-01</td>
+        <td class="level">Filesystem</td>
+        <td class="level">L1</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Path Allowlisting and Canonical Resolution</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-FS-02</td>
+        <td class="level">Filesystem</td>
+        <td class="level">L1</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Symlink Resolution Validation</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-NET-01</td>
+        <td class="level">Network</td>
+        <td class="level">L1</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">URL Validation and SSRF Mitigation</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-INPUT-01</td>
+        <td class="level">Input Validation</td>
+        <td class="level">L1</td>
+        <td><span class="badge pass">✓ met</span>
+        </td>
+        <td>
+          <div class="title">JSON Schema Validation</div>
+          <div class="fix"><b>Evidence checks:</b> TOOL-01, TOOL-03, RPC-03, TOOL-05, SEC-01, SEC-02, SEC-05</div>
+          
+          <div class="fix">Auto-assessed from advertised schemas (present and valid), live rejection probes, and the tool-metadata poisoning scan.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-LOG-02</td>
+        <td class="level">Logging</td>
+        <td class="level">L1</td>
+        <td><span class="badge pass">✓ met</span>
+        </td>
+        <td>
+          <div class="title">Secret Redaction in Logs</div>
+          <div class="fix"><b>Evidence checks:</b> SEC-03</div>
+          
+          <div class="fix">Auto-assessed over advertised tool metadata; server log output is not inspected.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-SUPPLY-02</td>
+        <td class="level">Supply Chain</td>
+        <td class="level">L2</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Trusted Package Sources</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-INPUT-02</td>
+        <td class="level">Input Validation</td>
+        <td class="level">L2</td>
+        <td><span class="badge pass">✓ met</span>
+        </td>
+        <td>
+          <div class="title">Input Bounds Enforcement</div>
+          <div class="fix"><b>Evidence checks:</b> SEC-04</div>
+          <div class="evidence">SEC-04: unconstrained injection-surface params: read_file.path, read_text_file.path, read_media_file.path, write_file.path, edit_file.path, create_directory.path, list_directory.path, list_directory_with_sizes.path, directory_tree.path, search_files.path, get_file_info.path</div>
+          <div class="fix">Auto-assessed from advertised schema constraints (enum/pattern/maxLength); runtime payload limits are not probed.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-INPUT-03</td>
+        <td class="level">Input Validation</td>
+        <td class="level">L2</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Timeout Enforcement</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-NET-03</td>
+        <td class="level">Network</td>
+        <td class="level">L2</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">TLS Enforcement</div>
+          
+          
+          <div class="fix">MSSS marks this N/A for stdio-only deployments with no network access.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-EXEC-02</td>
+        <td class="level">Execution</td>
+        <td class="level">L2</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Command Allowlisting</div>
+          
+          
+          <div class="fix">See the SEC-06 advisory for advertised command tools; allowlist verification requires source review.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-EXEC-03</td>
+        <td class="level">Execution</td>
+        <td class="level">L2</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Argument Separator Usage</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-AUTHZ-01</td>
+        <td class="level">Authorization</td>
+        <td class="level">L3</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">OAuth Token Delegation</div>
+          
+          
+          <div class="fix">MSSS marks this N/A for stdio transport with OS-level user isolation.</div>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-AUTHZ-02</td>
+        <td class="level">Authorization</td>
+        <td class="level">L3</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Per-Tool Scope Definition</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-AUTHZ-03</td>
+        <td class="level">Authorization</td>
+        <td class="level">L3</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Least Privilege Tool Design</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-AUTHZ-04</td>
+        <td class="level">Authorization</td>
+        <td class="level">L3</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Resource-Based Access Control</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-LOG-01</td>
+        <td class="level">Logging</td>
+        <td class="level">L3</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Comprehensive Audit Logging</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-DEPLOY-01</td>
+        <td class="level">Deployment</td>
+        <td class="level">L3</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Container Hardening</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-FS-03</td>
+        <td class="level">Filesystem</td>
+        <td class="level">L4</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Filesystem Sandboxing</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-SUPPLY-01</td>
+        <td class="level">Supply Chain</td>
+        <td class="level">L4</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Package Integrity Verification</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-DEPLOY-03</td>
+        <td class="level">Deployment</td>
+        <td class="level">L4</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Resource Limits and Rate Limiting</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-NET-02</td>
+        <td class="level">Network</td>
+        <td class="level">L4</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Egress Traffic Filtering</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-DEPLOY-02</td>
+        <td class="level">Deployment</td>
+        <td class="level">L4</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">System Call Filtering (seccomp/AppArmor)</div>
+          
+          
+          
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="id">MCP-DEPLOY-04</td>
+        <td class="level">Deployment</td>
+        <td class="level">L4</td>
+        <td><span class="badge skip">– manual review</span>
+        </td>
+        <td>
+          <div class="title">Runtime Integrity Monitoring</div>
+          
+          
+          <div class="fix">Future control in MSSS v0.1 — implementation details TBD upstream.</div>
+        </td>
+      </tr>
+    
+    </tbody>
+  </table>
+  <p class="attrib">Control taxonomy from the MCP Server Security Standard (MSSS), CC BY-SA 4.0, mcp-security-standard.org.</p>
+
+  
+  <h2>Behaviour regression</h2>
+  <table>
+    <thead><tr><th>Fixture</th><th>Tool</th><th>Verdict</th><th>Detail</th></tr></thead>
+    <tbody>
+    
+      <tr>
+        <td class="id">read_file__e8cf9eda.json</td>
+        <td>read_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_file__0c5f5c79.json</td>
+        <td>read_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_file__fe0dcdc6.json</td>
+        <td>read_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_file__518341a7.json</td>
+        <td>read_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_text_file__e8cf9eda.json</td>
+        <td>read_text_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_text_file__0c5f5c79.json</td>
+        <td>read_text_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_text_file__fe0dcdc6.json</td>
+        <td>read_text_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_text_file__518341a7.json</td>
+        <td>read_text_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_media_file__e8cf9eda.json</td>
+        <td>read_media_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_media_file__0c5f5c79.json</td>
+        <td>read_media_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_media_file__fe0dcdc6.json</td>
+        <td>read_media_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_media_file__518341a7.json</td>
+        <td>read_media_file</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">read_multiple_files__dfea4edf.json</td>
+        <td>read_multiple_files</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_directory__e8cf9eda.json</td>
+        <td>list_directory</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_directory__0c5f5c79.json</td>
+        <td>list_directory</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_directory__fe0dcdc6.json</td>
+        <td>list_directory</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_directory__518341a7.json</td>
+        <td>list_directory</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_directory_with_sizes__e8cf9eda.json</td>
+        <td>list_directory_with_sizes</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_directory_with_sizes__0c5f5c79.json</td>
+        <td>list_directory_with_sizes</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_directory_with_sizes__fe0dcdc6.json</td>
+        <td>list_directory_with_sizes</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_directory_with_sizes__518341a7.json</td>
+        <td>list_directory_with_sizes</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">directory_tree__e8cf9eda.json</td>
+        <td>directory_tree</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">directory_tree__0c5f5c79.json</td>
+        <td>directory_tree</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">directory_tree__fe0dcdc6.json</td>
+        <td>directory_tree</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">directory_tree__518341a7.json</td>
+        <td>directory_tree</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">search_files__580853a9.json</td>
+        <td>search_files</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">search_files__83e4c665.json</td>
+        <td>search_files</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">search_files__2831e0f1.json</td>
+        <td>search_files</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">search_files__ee546753.json</td>
+        <td>search_files</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">get_file_info__e8cf9eda.json</td>
+        <td>get_file_info</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">get_file_info__0c5f5c79.json</td>
+        <td>get_file_info</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">get_file_info__fe0dcdc6.json</td>
+        <td>get_file_info</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">get_file_info__518341a7.json</td>
+        <td>get_file_info</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+      <tr>
+        <td class="id">list_allowed_directories__44136fa3.json</td>
+        <td>list_allowed_directories</td>
+        <td><span class="badge ok">OK</span></td>
+        <td><div class="evidence"></div></td>
+      </tr>
+    
+    </tbody>
+  </table>
+
+  <div class="leave">
+    <h2>Leave-behind: your regression gate</h2>
+    <p>The recorded fixtures (<span style="font-family:var(--mono)">demo/fixtures-filesystem</span>,
+       suite fingerprint <span style="font-family:var(--mono)">sha256:0764fd6d84d392dbff575042634e29e75bfa82344acc43b68759ae9166d7c478</span>)
+       are the behavioural contract of this server. Keep them in the repository and run the workflow below in CI —
+       any breaking or value drift fails the build before it reaches your users.</p>
+    <pre># The recorded fixtures in demo/fixtures-filesystem are the behavioral contract: any drift fails this job.
+name: mcp-proof regression gate
+on:
+  push:
+  pull_request:
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: &#34;3.11&#34;
+      - name: Install mcp-proof
+        # not on PyPI yet — install from the repo that delivered this report:
+        # pip install git+https://github.com/YuCPbit/mcp-proof
+        run: pip install mcp-proof
+      - name: Replay golden fixtures against the live server
+        run: mcp-proof replay --fixtures demo/fixtures-filesystem -- npx -y @modelcontextprotocol/server-filesystem /tmp/mcp-proof-sandbox
+</pre>
+  </div>
+  
+
+  <h2>Recommended next steps</h2>
+  <ol class="steps">
+    
+    <li><span class="prio p1">P1</span><span>LIFE-02 — Upgrade the server SDK to a release that speaks the 2026-07-28 spec revision.</span></li>
+    
+    <li><span class="prio p1">P1</span><span>SEC-04 — Add enum, pattern or maxLength to path/url/command-like string params.</span></li>
+    
+  </ol>
+
+  <footer>
+    Reproducible audit — the fingerprint covers every check outcome and replay result (not the timestamp).
+    Re-run with identical server behaviour and the hash matches:
+    <span class="mono">sha256:b01888e9b1e702b033048412a30239a105107b08e534bdbb50d40ab8a51a7601</span><br>
+    Generated by mcp-proof v0.2.0 · deterministic lanes only, no LLM judging · MCP spec reference 2026-07-28
+  </footer>
+
+</div>
+</body>
+</html>

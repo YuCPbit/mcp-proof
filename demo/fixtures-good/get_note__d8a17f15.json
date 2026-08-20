@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "tool": "get_note",
+  "args": {
+    "title": "example"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "example"
+      }
+    ]
+  },
+  "response_sha256": "4204a3de8a41206037f522f68a3e97f13ffafb95cd15a6f98d708eac2a9bdef0",
+  "latency_ms": 2,
+  "recorded_at": "2026-08-18T04:24:45.177211+00:00",
+  "server_cmd": [
+    ".venv/bin/python",
+    "demo/good_server.py"
+  ]
+}

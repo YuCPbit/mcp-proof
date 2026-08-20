@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ server_name }} — MCP Delivery Report</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --card: #fcfcfb;
+    --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #898781;
+    --hairline: #e1e0d9; --ring: rgba(11,11,11,.10);
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+    --good-text: #006300; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 24px 64px; }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .brand .mark { font-weight: 700; letter-spacing: -.01em; }
+  .brand .doc { color: var(--ink-3); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+  h1 { margin: 0 0 14px; font-size: 28px; letter-spacing: -.02em; }
+  h2 { margin: 40px 0 12px; font-size: 17px; letter-spacing: -.01em; }
+  .verdict { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 8px;
+             font-weight: 650; font-size: 14px; border: 1px solid; margin-bottom: 22px; }
+  .verdict.pass { color: var(--good-text); border-color: var(--good); background: rgba(12,163,12,.08); }
+  .verdict.fail { color: var(--critical); border-color: var(--critical); background: rgba(208,59,59,.07); }
+  .verdict .why { font-weight: 400; color: var(--ink-2); }
+  .meta { display: grid; grid-template-columns: 150px 1fr; gap: 4px 16px; font-size: 13px;
+          background: var(--card); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; }
+  .meta dt { color: var(--ink-3); } .meta dd { margin: 0; word-break: break-all; }
+  .meta .mono { font-family: var(--mono); font-size: 12px; }
+  .note-warn { color: var(--ink-2); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile { background: var(--card); border: 1px solid var(--ring); border-top: 3px solid var(--tile-accent, var(--hairline));
+          border-radius: 10px; padding: 14px 16px 12px; }
+  .tile .k { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); }
+  .tile .v { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 2px 0 0; }
+  .tile .s { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--ring);
+          border-radius: 10px; overflow: hidden; font-size: 13.5px; }
+  th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em;
+       color: var(--ink-3); font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--hairline); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.id { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+  td.level { color: var(--ink-3); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .title { font-weight: 550; }
+  .evidence { color: var(--ink-2); font-size: 12.5px; margin-top: 2px; word-break: break-word; }
+  .fix { color: var(--ink-3); font-size: 12.5px; margin-top: 2px; }
+  .fix b { color: var(--ink-2); font-weight: 600; }
+  .msss-lead { font-size: 13.5px; color: var(--ink-2); margin: 0 0 12px; }
+  .msss-lead b { color: var(--ink); }
+  .attrib { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px;
+           font-size: 12px; font-weight: 650; border: 1px solid; white-space: nowrap; color: var(--ink); }
+  .badge.pass   { border-color: var(--good);     background: rgba(12,163,12,.10); }
+  .badge.fail   { border-color: var(--critical); background: rgba(208,59,59,.10); }
+  .badge.warn   { border-color: var(--warning);  background: rgba(250,178,25,.14); }
+  .badge.skip   { border-color: var(--hairline); background: transparent; color: var(--ink-3); }
+  .badge.breaking { border-color: var(--critical); background: rgba(208,59,59,.10); }
+  .badge.error    { border-color: var(--critical); background: rgba(208,59,59,.10); }
+  .badge.value    { border-color: var(--serious);  background: rgba(236,131,90,.13); }
+  .badge.latency  { border-color: var(--warning);  background: rgba(250,178,25,.14); }
+  .badge.cosmetic { border-color: var(--hairline); background: transparent; color: var(--ink-2); }
+  .badge.ok       { border-color: var(--good);     background: rgba(12,163,12,.10); }
+  pre { background: var(--card); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px;
+        font-family: var(--mono); font-size: 12px; line-height: 1.55; overflow-x: auto; }
+  ol.steps { margin: 0; padding: 4px 0 0 0; list-style: none; }
+  ol.steps li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0;
+                border-bottom: 1px solid var(--hairline); font-size: 13.5px; }
+  ol.steps li:last-child { border-bottom: 0; }
+  .prio { flex: none; display: inline-block; min-width: 38px; text-align: center; padding: 1px 8px;
+          border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid; }
+  .prio.p0   { border-color: var(--critical); background: rgba(208,59,59,.10); }
+  .prio.p1   { border-color: var(--warning);  background: rgba(250,178,25,.14); }
+  .prio.keep { border-color: var(--good);     background: rgba(12,163,12,.10); }
+  .leave p { font-size: 13.5px; color: var(--ink-2); }
+  footer { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--hairline);
+           font-size: 12px; color: var(--ink-3); }
+  footer .mono { font-family: var(--mono); word-break: break-all; }
+  @media print {
+    body { background: #fff; } .wrap { padding: 0; max-width: none; }
+    tr, .tile { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand"><span class="mark">mcp-proof</span><span class="doc">Delivery report</span></div>
+  <h1>{{ server_name }}</h1>
+
+  {% if verdict_pass %}
+  <div class="verdict pass">✓ SHIP-READY <span class="why">— all MUST checks pass, no security findings{% if regression %}, no behavioural drift{% endif %}</span></div>
+  {% else %}
+  <div class="verdict fail">✗ NOT SHIP-READY <span class="why">— {{ blockers | join("; ") }}</span></div>
+  {% endif %}
+
+  <dl class="meta">
+    <dt>Server under test</dt><dd class="mono">{{ server_cmd }}</dd>
+    <dt>Generated</dt><dd>{{ generated_at }} · mcp-proof v{{ tool_version }}</dd>
+    <dt>Protocol</dt><dd>negotiated <span class="mono">{{ negotiated_protocol }}</span>
+      {% if migrated %} · current ({{ latest_spec }}){% else %} · <span class="note-warn">latest spec is {{ latest_spec }} — migration recommended</span>{% endif %}</dd>
+    <dt>Run fingerprint</dt><dd class="mono">sha256:{{ run_hash }}</dd>
+  </dl>
+
+  <div class="tiles">
+    <div class="tile" style="--tile-accent: {{ 'var(--good)' if must_ok == must_total else 'var(--critical)' }}">
+      <div class="k">Conformance</div>
+      <div class="v">{{ must_ok }}/{{ must_total }}</div>
+      <div class="s">MUST checks passed · {{ should_ok }}/{{ should_total }} SHOULD</div>
+    </div>
+    <div class="tile" style="--tile-accent: {{ 'var(--good)' if sec_fails == 0 else 'var(--critical)' }}">
+      <div class="k">Security</div>
+      <div class="v">{{ sec_fails + sec_warns }}</div>
+      <div class="s">finding{{ 's' if sec_fails + sec_warns != 1 }} · {{ sec_fails }} blocking · {{ sec_warns }} advisory</div>
+    </div>
+    <div class="tile" style="--tile-accent: {{ ('var(--good)' if regression.summary.gate_pass else 'var(--critical)') if regression else 'var(--hairline)' }}">
+      <div class="k">Behaviour regression</div>
+      {% if regression %}
+      <div class="v">{{ regression.summary.ok }}/{{ regression.drifts | length }}</div>
+      <div class="s">replays clean · gate {{ 'PASS' if regression.summary.gate_pass else 'FAIL' }}</div>
+      {% else %}
+      <div class="v">—</div>
+      <div class="s">not recorded (run <span style="font-family:var(--mono)">mcp-proof record</span>)</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% macro status_badge(status) -%}
+    {%- if status == 'PASS' %}<span class="badge pass">✓ PASS</span>
+    {%- elif status == 'FAIL' %}<span class="badge fail">✗ FAIL</span>
+    {%- elif status == 'WARN' %}<span class="badge warn">! WARN</span>
+    {%- else %}<span class="badge skip">– SKIP</span>{% endif -%}
+  {%- endmacro %}
+
+  <h2>Protocol conformance</h2>
+  <table>
+    <thead><tr><th>Check</th><th>Level</th><th>Result</th><th>Details</th></tr></thead>
+    <tbody>
+    {% for r in conformance %}
+      <tr>
+        <td class="id">{{ r.id }}</td>
+        <td class="level">{{ r.level }}</td>
+        <td>{{ status_badge(r.status) }}</td>
+        <td>
+          <div class="title">{{ r.title }}</div>
+          {% if r.evidence %}<div class="evidence">{{ r.evidence }}</div>{% endif %}
+          {% if r.fix_hint and r.status in ('FAIL', 'WARN') %}<div class="fix"><b>Fix:</b> {{ r.fix_hint }}</div>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Security &amp; hygiene</h2>
+  <table>
+    <thead><tr><th>Check</th><th>Domain</th><th>Result</th><th>Details</th></tr></thead>
+    <tbody>
+    {% for r in security %}
+      <tr>
+        <td class="id">{{ r.id }}</td>
+        <td class="level">{{ r.msss_ref or '—' }}</td>
+        <td>{{ status_badge(r.status) }}</td>
+        <td>
+          <div class="title">{{ r.title }}</div>
+          {% if r.evidence %}<div class="evidence">{{ r.evidence }}</div>{% endif %}
+          {% if r.fix_hint and r.status in ('FAIL', 'WARN') %}<div class="fix"><b>Fix:</b> {{ r.fix_hint }}</div>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>MSSS compliance</h2>
+  <p class="msss-lead"><b>{{ msss.headline }}.</b>
+     Mapped against {{ msss.standard }} ({{ msss.mapping }}): {{ msss.overall.auto_met + msss.overall.auto_gap }} of
+     {{ msss.overall.total }} controls are auto-assessable from this audit's deterministic checks; the remaining
+     {{ msss.overall.manual }} need deployment, code or process evidence and are marked manual review — never assessed
+     by this tool.</p>
+  <table>
+    <thead><tr><th>Control</th><th>Domain</th><th>Level</th><th>Result</th><th>Title</th></tr></thead>
+    <tbody>
+    {% for c in msss.controls %}
+      <tr>
+        <td class="id">{{ c.id }}</td>
+        <td class="level">{{ c.domain }}</td>
+        <td class="level">{{ c.min_level }}</td>
+        <td>
+          {%- if c.status == 'met' %}<span class="badge pass">✓ met</span>
+          {%- elif c.status == 'gap' %}<span class="badge fail">✗ gap</span>
+          {%- else %}<span class="badge skip">– manual review</span>{% endif %}
+        </td>
+        <td>
+          <div class="title">{{ c.title }}</div>
+          {% if c.checks %}<div class="fix"><b>Evidence checks:</b> {{ c.checks | join(", ") }}</div>{% endif %}
+          {% if c.notes %}<div class="evidence">{{ c.notes }}</div>{% endif %}
+          {% if c.scope %}<div class="fix">{{ c.scope }}</div>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="attrib">Control taxonomy from the MCP Server Security Standard (MSSS), CC BY-SA 4.0, mcp-security-standard.org.</p>
+
+  {% if regression %}
+  <h2>Behaviour regression</h2>
+  <table>
+    <thead><tr><th>Fixture</th><th>Tool</th><th>Verdict</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for d in regression.drifts %}
+      <tr>
+        <td class="id">{{ d.fixture }}</td>
+        <td>{{ d.tool }}</td>
+        <td><span class="badge {{ d.kind | lower }}">{{ d.kind }}</span></td>
+        <td><div class="evidence">{{ d.detail }}</div></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="leave">
+    <h2>Leave-behind: your regression gate</h2>
+    <p>The recorded fixtures (<span style="font-family:var(--mono)">{{ regression.fixtures_dir }}</span>,
+       suite fingerprint <span style="font-family:var(--mono)">sha256:{{ regression.fixtures_sha256 }}</span>)
+       are the behavioural contract of this server. Keep them in the repository and run the workflow below in CI —
+       any breaking or value drift fails the build before it reaches your users.</p>
+    <pre>{{ regression.action_yaml }}</pre>
+  </div>
+  {% endif %}
+
+  <h2>Recommended next steps</h2>
+  <ol class="steps">
+    {% for s in next_steps %}
+    <li><span class="prio {{ s.p | lower }}">{{ s.p }}</span><span>{{ s.text }}</span></li>
+    {% endfor %}
+  </ol>
+
+  <footer>
+    Reproducible audit — the fingerprint covers every check outcome and replay result (not the timestamp).
+    Re-run with identical server behaviour and the hash matches:
+    <span class="mono">sha256:{{ run_hash }}</span><br>
+    Generated by mcp-proof v{{ tool_version }} · deterministic lanes only, no LLM judging · MCP spec reference {{ latest_spec }}
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "tool": "list_directory_with_sizes",
+  "case": "empty-string",
+  "args": {
+    "path": ""
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "\nTotal: 0 files, 0 directories\nCombined size: 0 B"
+      }
+    ]
+  },
+  "response_sha256": "b05e5c653b083d44ece1ba23b7a641ca7fa8d147a132adb3de4a8bdf44c11102",
+  "latency_ms": 0,
+  "recorded_at": "2026-08-20T11:56:17.679482+00:00",
+  "server_cmd": [
+    "npx",
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    "/tmp/mcp-proof-sandbox"
+  ]
+}
