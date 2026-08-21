@@ -91,7 +91,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 ## ⚙️ 一步接入 CI
 
 ```yaml
-- uses: YuCPbit/mcp-proof@v0.5.0
+- uses: YuCPbit/mcp-proof@v0.7.0
   with:
     server-command: python my_server.py
     fixtures: fixtures/

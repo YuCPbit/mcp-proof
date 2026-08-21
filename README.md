@@ -97,7 +97,7 @@ Works with servers in **any language** — mcp-proof talks to the process (or UR
 ## ⚙️ CI in one step
 
 ```yaml
-- uses: YuCPbit/mcp-proof@v0.5.0
+- uses: YuCPbit/mcp-proof@v0.7.0
   with:
     server-command: python my_server.py
     fixtures: fixtures/
