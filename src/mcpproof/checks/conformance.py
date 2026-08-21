@@ -239,7 +239,12 @@ _MODERN_IDS = (
 
 @dataclass
 class ConformanceOutcome:
-    """Check results plus what era detection learned (feeds report + other lanes)."""
+    """Check results plus what era detection learned (feeds report + other lanes).
+
+    ``audit_error`` set means mcp-proof's own check logic failed — the audit is
+    INCONCLUSIVE. It is never folded into a target verdict: an auditor bug must
+    not read as "the server failed" (exit code 2, not 1).
+    """
 
     results: list[CheckResult]
     era: str  # "modern" | "legacy"
@@ -247,6 +252,7 @@ class ConformanceOutcome:
     discovery: str | None = None  # "server/discover" | "initialize"
     server_name: str | None = None
     tools: list = field(default_factory=list)
+    audit_error: str | None = None
 
 
 def _res(check_id: str, status: str, evidence: str = "") -> CheckResult:
@@ -269,11 +275,22 @@ def _discover_failed(detail: str) -> list[CheckResult]:
     return out
 
 
+# What "no response" may legitimately mean: the transport died under us.
+# TimeoutError/OSError cover sockets and pipes; ValueError covers writes to an
+# already-closed asyncio pipe ("I/O operation on closed pipe").
+_TRANSPORT_ERRORS = (TimeoutError, OSError, ValueError)
+
+
 async def _safe(coro):
-    """Probe transport failures (dead pipe, etc.) count as no-response."""
+    """Probe transport failures (dead pipe, etc.) count as no-response.
+
+    Deliberately narrow: any other exception is a bug in mcp-proof's own
+    logic and must propagate to the per-lane guard in run_conformance, where
+    it becomes an INCONCLUSIVE audit — never evidence against the target.
+    """
     try:
         return await coro
-    except Exception:
+    except _TRANSPORT_ERRORS:
         return None
 
 
@@ -296,6 +313,17 @@ def _make_probe(cmd: list[str] | None, url: str | None):
     return RawProbe(cmd)
 
 
+def _inconclusive(era: str, exc: Exception, revision: str | None = None,
+                  discovery: str | None = None) -> ConformanceOutcome:
+    """An exception in mcp-proof's own check logic. Nothing was proven about
+    the target either way, so the one verdict this must never produce is
+    'the server failed'."""
+    return ConformanceOutcome(
+        [], era, revision, discovery,
+        audit_error=f"{type(exc).__name__}: {exc}",
+    )
+
+
 async def run_conformance(
     cmd: list[str] | None, url: str | None = None, era: str = AUTO
 ) -> ConformanceOutcome:
@@ -307,7 +335,10 @@ async def run_conformance(
                 result = disc.get("result") if isinstance(disc, dict) else None
                 info = parse_discover_result(result) if isinstance(result, dict) else None
                 if info is not None:
-                    results = await _run_modern_checks(probe, info)
+                    try:
+                        results = await _run_modern_checks(probe, info)
+                    except Exception as exc:  # auditor bug, not target behaviour
+                        return _inconclusive(MODERN, exc, info.revision, "server/discover")
                     return ConformanceOutcome(
                         results, MODERN, info.revision, "server/discover",
                         info.server_info.get("name"), _tools_of(probe),
@@ -330,7 +361,10 @@ async def run_conformance(
         # legacy era, on a fresh probe: the discover attempt above must never
         # colour the session the legacy checks observe
         async with _make_probe(cmd, url) as probe:
-            results, init_result, tools = await _run_legacy_checks(probe)
+            try:
+                results, init_result, tools = await _run_legacy_checks(probe)
+            except Exception as exc:  # auditor bug, not target behaviour
+                return _inconclusive(LEGACY, exc, discovery="initialize")
             server_info = init_result.get("serverInfo")
             return ConformanceOutcome(
                 results, LEGACY,
@@ -338,11 +372,16 @@ async def run_conformance(
                 server_info.get("name") if isinstance(server_info, dict) else None,
                 tools,
             )
-    except Exception as exc:  # server never came up; report instead of raising
+    except _TRANSPORT_ERRORS as exc:
+        # the probe could not be brought up or torn down at all — target-side
+        # evidence (bad command, dead endpoint), reported instead of raised
         detail = f"could not start probe: {type(exc).__name__}: {exc}"
         if era == MODERN:
             return ConformanceOutcome(_discover_failed(detail), MODERN)
         return ConformanceOutcome(_handshake_failed(detail), LEGACY)
+    except Exception as exc:
+        # anything else at this level is mcp-proof's own machinery failing
+        return _inconclusive(MODERN if era == MODERN else LEGACY, exc)
 
 
 def _tools_of(probe) -> list:

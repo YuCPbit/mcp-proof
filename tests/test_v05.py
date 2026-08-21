@@ -23,7 +23,7 @@ def _run(tmp_path, server_cmd, expect_exit):
         [PYTHON, "-m", "mcpproof.cli", "run",
          "--out", str(out), "--json", str(paths["json"]),
          "--junit", str(paths["junit"]), "--sarif", str(paths["sarif"]),
-         "--fixtures", str(tmp_path / "fx"), "--", *server_cmd],
+         "--fixtures", str(tmp_path / "fx"), "--record-if-missing", "--", *server_cmd],
         cwd=ROOT, capture_output=True, text=True, timeout=180,
     )
     assert proc.returncode == expect_exit, proc.stdout + proc.stderr

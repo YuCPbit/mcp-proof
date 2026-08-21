@@ -22,12 +22,14 @@ def test_run_good_server_ships_ready_and_exits_zero(tmp_path):
     out = tmp_path / "report.html"
     proc = run_cli(
         "run", PYTHON, str(ROOT / "demo" / "good_server.py"),
-        "--fixtures", str(tmp_path / "fixtures"), "--out", str(out),
+        "--fixtures", str(tmp_path / "fixtures"), "--record-if-missing", "--out", str(out),
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     html = out.read_text(encoding="utf-8")
     assert "SHIP-READY" in html and "NOT SHIP-READY" not in html
-    assert "gate PASS" in html
+    # a baseline created in the same run must present itself as exactly that,
+    # not as a historical regression verdict
+    assert "self-replay PASS — no historical comparison" in html
     assert "Recommended next steps" in html and ">P1<" in html
 
 

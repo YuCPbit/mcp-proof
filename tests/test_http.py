@@ -123,7 +123,7 @@ def test_cli_run_over_http_produces_report(http_url, tmp_path):
     out = tmp_path / "report.html"
     proc = subprocess.run(
         [venv_python(), "-m", "mcpproof.cli", "run", "--url", http_url,
-         "--fixtures", str(tmp_path / "fx"), "--out", str(out)],
+         "--fixtures", str(tmp_path / "fx"), "--record-if-missing", "--out", str(out)],
         cwd=ROOT, capture_output=True, text=True, timeout=120,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr

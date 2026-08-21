@@ -29,7 +29,11 @@
              font-weight: 650; font-size: 14px; border: 1px solid; margin-bottom: 22px; }
   .verdict.pass { color: var(--good-text); border-color: var(--good); background: rgba(12,163,12,.08); }
   .verdict.fail { color: var(--critical); border-color: var(--critical); background: rgba(208,59,59,.07); }
+  .verdict.inconclusive { color: var(--ink-2); border-color: var(--warning); background: rgba(250,178,25,.10); }
   .verdict .why { font-weight: 400; color: var(--ink-2); }
+  .scope { background: var(--card); border: 1px solid var(--ring); border-radius: 10px;
+           padding: 12px 16px; margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+  .scope b { color: var(--ink); }
   .meta { display: grid; grid-template-columns: 150px 1fr; gap: 4px 16px; font-size: 13px;
           background: var(--card); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; }
   .meta dt { color: var(--ink-3); } .meta dd { margin: 0; word-break: break-all; }
@@ -125,8 +129,10 @@
   <div class="brand"><span class="mark">mcp-proof</span><span class="doc">Delivery report</span></div>
   <h1>{{ server_name }}</h1>
 
-  {% if verdict_pass %}
-  <div class="verdict pass">✓ SHIP-READY <span class="why">— all MUST checks pass, no security findings{% if regression %}, no behavioural drift{% endif %}</span></div>
+  {% if audit_status == 'inconclusive' %}
+  <div class="verdict inconclusive">◌ AUDIT INCONCLUSIVE <span class="why">— mcp-proof's own check logic failed ({{ audit_error }}); nothing was proven about this server, in either direction</span></div>
+  {% elif verdict_pass %}
+  <div class="verdict pass">✓ SHIP-READY <span class="why">— all MUST checks pass, no blocking security findings{% if regression %}, no behavioural drift{% endif %}</span></div>
   {% else %}
   <div class="verdict fail">✗ NOT SHIP-READY <span class="why">— {{ blockers | join("; ") }}</span></div>
   {% endif %}
@@ -154,13 +160,37 @@
       <div class="k">Behaviour regression</div>
       {% if regression %}
       <div class="v">{{ regression.summary.ok }}/{{ regression.summary.content_total }}</div>
+      {% if regression.baseline_created %}
+      <div class="s">baseline recorded this run · self-replay {{ 'PASS' if regression.summary.gate_pass else 'FAIL' }} — no historical comparison</div>
+      {% else %}
       <div class="s">replays clean · gate {{ 'PASS' if regression.summary.gate_pass else 'FAIL' }}{% if regression.summary.latency %} · {{ regression.summary.latency }} latency advisor{{ 'y' if regression.summary.latency == 1 else 'ies' }}{% endif %}</div>
+      {% endif %}
       {% else %}
       <div class="v">—</div>
       <div class="s">not recorded (run <span style="font-family:var(--mono)">mcp-proof record</span>)</div>
       {% endif %}
     </div>
   </div>
+
+  <div class="scope">
+    <b>Evidence scope.</b> This report proves what was observed on the wire: protocol
+    conformance of the served surface, static analysis of advertised tool metadata{% if regression %},
+    and behavioural equality against the recorded fixture baseline{% endif %}. It does not assess
+    deployment, source code, process controls or authorization/OAuth flows — MSSS controls that
+    need such evidence are marked <i>manual review</i> (or <i>partial</i>), never assumed.
+  </div>
+
+  {% macro next_steps_block() -%}
+  <h2 id="next-steps">Recommended next steps</h2>
+  <ol class="steps">
+    {% for s in next_steps %}
+    <li><span class="prio {{ s.p | lower }}">{{ s.p }}</span><span>{{ s.text }}</span></li>
+    {% endfor %}
+  </ol>
+  {%- endmacro %}
+
+  {% set steps_on_top = audit_status == 'inconclusive' or not verdict_pass %}
+  {% if steps_on_top %}{{ next_steps_block() }}{% endif %}
 
   {% macro status_badge(status) -%}
     {%- if status == 'PASS' %}<span class="badge pass">✓ PASS</span>
@@ -269,12 +299,7 @@
   </div>
   {% endif %}
 
-  <h2 id="next-steps">Recommended next steps</h2>
-  <ol class="steps">
-    {% for s in next_steps %}
-    <li><span class="prio {{ s.p | lower }}">{{ s.p }}</span><span>{{ s.text }}</span></li>
-    {% endfor %}
-  </ol>
+  {% if not steps_on_top %}{{ next_steps_block() }}{% endif %}
 
   <footer>
     Reproducible audit — the behaviour fingerprint covers every check verdict and behavioural

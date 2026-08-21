@@ -1,7 +1,14 @@
-"""Orchestrates the lanes behind the CLI commands."""
+"""Orchestrates the lanes behind the CLI commands.
+
+Exit-code taxonomy (run/replay): 0 = audit completed, target ship-ready;
+1 = audit completed, target failed it; 2 = audit did not complete — missing
+baseline, auditor internal error, or a lane that could not finish. A 2 is
+never evidence against the target.
+"""
 
 import asyncio
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -9,6 +16,10 @@ from pathlib import Path
 
 from .checks.base import FAIL, MUST
 from .report.builder import build_report
+
+
+class BaselineMissingError(RuntimeError):
+    """`run --fixtures` pointed at a directory with no recorded baseline."""
 
 
 def _find_chrome() -> str | None:
@@ -20,6 +31,14 @@ def _find_chrome() -> str | None:
         for p in mac_apps:
             if Path(p).exists():
                 return p
+    if sys.platform == "win32":
+        # Chrome installs outside PATH on Windows; check the conventional roots
+        for env_var in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+            root = os.environ.get(env_var)
+            if root:
+                candidate = Path(root) / "Google" / "Chrome" / "Application" / "chrome.exe"
+                if candidate.exists():
+                    return str(candidate)
     for name in ("google-chrome", "chromium", "chromium-browser", "chrome"):
         found = shutil.which(name)
         if found:
@@ -53,8 +72,18 @@ async def _regression_lane(args, cmd: list[str] | None, url: str | None, era: st
 
     fdir = Path(args.fixtures)
     manifest = fdir / "_manifest.json"
+    baseline_created = False
     if not manifest.exists():
-        print(f"→ regression lane: no baseline at {fdir}, recording one")
+        if not getattr(args, "record_if_missing", False):
+            # fail closed: with no baseline the lane would record current
+            # behaviour and then verify current behaviour against itself —
+            # a gate that can silently regenerate its own contract is not a gate
+            raise BaselineMissingError(
+                f"no baseline at {fdir} — run `mcp-proof record --fixtures {fdir} ...` "
+                "to freeze one, or pass --record-if-missing to opt in to recording here"
+            )
+        baseline_created = True
+        print(f"→ regression lane: no baseline at {fdir}, recording one (--record-if-missing)")
         skipped: list[str] = []
         unsynthesizable: list[str] = []
         await record(cmd, fdir, include_destructive=args.include_destructive,
@@ -77,6 +106,7 @@ async def _regression_lane(args, cmd: list[str] | None, url: str | None, era: st
         "fixtures_sha256": fixtures_sha,
         "fixtures_dir": str(fdir),
         "action_yaml": github_action_yaml(cmd, str(fdir), url=url),
+        "baseline_created": baseline_created,
     }
 
 
@@ -112,10 +142,18 @@ async def _cmd_run(args) -> int:
     sec = run_security(tools)
 
     regression = None
-    if args.fixtures:
+    if args.fixtures and not outcome.audit_error:
         # the conformance lane already learned the era — the regression lane
         # rides the same verdict instead of sniffing again
-        regression = await _regression_lane(args, cmd, url, era=outcome.era)
+        try:
+            regression = await _regression_lane(args, cmd, url, era=outcome.era)
+        except BaselineMissingError as exc:
+            print(f"✗ audit did not complete — {exc}")
+            return 2
+        except Exception as exc:
+            print(f"✗ audit did not complete — regression lane failed: "
+                  f"{type(exc).__name__}: {exc}")
+            return 2
 
     out = build_report(
         server_name=server_name,
@@ -130,6 +168,7 @@ async def _cmd_run(args) -> int:
         json_path=getattr(args, "json", None),
         junit_path=getattr(args, "junit", None),
         sarif_path=getattr(args, "sarif", None),
+        audit_error=outcome.audit_error,
     )
     for label, path in (("JSON", getattr(args, "json", None)),
                         ("JUnit", getattr(args, "junit", None)),
@@ -142,6 +181,11 @@ async def _cmd_run(args) -> int:
         if pdf:
             print(f"✓ PDF written: {pdf}")
 
+    if outcome.audit_error:
+        print(f"✗ audit INCONCLUSIVE — internal auditor error: {outcome.audit_error}")
+        print(f"  nothing was proven about the target; inconclusive report written to {out}")
+        return 2
+
     must_fails = [r for r in conf if r.level == MUST and r.status == FAIL]
     sec_fails = [r for r in sec if r.status == FAIL]
     gate_ok = not must_fails and not sec_fails and (
@@ -151,6 +195,8 @@ async def _cmd_run(args) -> int:
     line = f"  conformance MUST failures: {len(must_fails)} | security findings: {len(sec_fails)}"
     if regression:
         line += f" | drift gate: {'PASS' if regression['summary']['gate_pass'] else 'FAIL'}"
+        if regression.get("baseline_created"):
+            line += " (baseline recorded this run — no historical comparison)"
     print(line)
     return 0 if gate_ok else 1
 
@@ -245,6 +291,43 @@ async def _cmd_record(args) -> int:
     return 0
 
 
+async def _cmd_verify(args) -> int:
+    """Recompute a stored JSON report model's fingerprints offline.
+
+    The model is self-contained: both hashes are derived from fields it
+    carries, so a match proves neither the verdicts (behaviour fingerprint)
+    nor the recorded audit inputs (run fingerprint) were edited after the
+    report was written. No server, no network.
+    """
+    from .report.model import recompute_hashes
+
+    try:
+        model = json.loads(Path(args.report).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"✗ cannot read report model: {exc}")
+        return 2
+    if not isinstance(model, dict) or "behavior_sha256" not in model:
+        print("✗ not a verifiable mcp-proof report model (needs report_schema_version ≥ 2 "
+              "with a behavior_sha256 — produced by `mcp-proof run --json ...`)")
+        return 2
+    try:
+        behavior, run_hash = recompute_hashes(model)
+    except (KeyError, TypeError) as exc:
+        print(f"✗ report model is missing hash inputs ({exc}) — truncated or hand-edited")
+        return 1
+    ok_behavior = behavior == model.get("behavior_sha256")
+    ok_run = run_hash == model.get("run_hash")
+    print(f"behaviour fingerprint  {'✓ verified' if ok_behavior else '✗ MISMATCH'}"
+          f"  sha256:{model.get('behavior_sha256', '')[:20]}…")
+    print(f"audit-run fingerprint  {'✓ verified' if ok_run else '✗ MISMATCH'}"
+          f"  sha256:{model.get('run_hash', '')[:20]}…")
+    if ok_behavior and ok_run:
+        print("✓ report intact: verdicts and recorded audit inputs match their fingerprints")
+        return 0
+    print("✗ report was modified after it was written (or produced by an incompatible mcp-proof)")
+    return 1
+
+
 async def _cmd_replay(args) -> int:
     from .regression.replayer import replay, summarize
 
@@ -266,5 +349,6 @@ def dispatch(args) -> int:
     handler = {
         "run": _cmd_run, "record": _cmd_record, "replay": _cmd_replay,
         "plan": _cmd_plan, "inspect": _cmd_inspect, "diff": _cmd_diff,
+        "verify": _cmd_verify,
     }[args.command]
     return asyncio.run(handler(args))

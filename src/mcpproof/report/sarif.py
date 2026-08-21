@@ -78,6 +78,7 @@ def sarif_json(model: dict) -> dict:
             "properties": {
                 "runHash": model["run_hash"],
                 "behaviorSha256": model["behavior_sha256"],
+                "auditStatus": model["audit"]["status"],
                 "shipReady": model["verdict"]["ship_ready"],
                 "protocolEra": model["server"]["era"],
             },

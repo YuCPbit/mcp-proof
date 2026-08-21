@@ -1,6 +1,6 @@
 [project]
 name = "mcp-proof"
-version = "0.7.0"
+version = "0.7.1"
 description = "Ship an MCP server with a receipt: deterministic conformance, security and regression audit that outputs a client-ready delivery report."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,9 +17,9 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",
 ]
-# mcp is pinned below 2.x: the 2.0 SDK (2026-07-28 spec era) renames the
-# client-facing model fields this package reads (e.g. Tool.inputSchema →
-# input_schema). The pin moves with the v0.3 dual-era work, not before.
+# mcp stays pinned below 2.x: the 1.x and 2.x SDKs cannot share a venv, and
+# this package needs the 1.x client for legacy-era sessions — the modern
+# (2026-07-28) era is spoken by our own wire-level probes, no 2.x SDK needed.
 dependencies = [
     "mcp>=1.29,<2",
     "httpx>=0.27",

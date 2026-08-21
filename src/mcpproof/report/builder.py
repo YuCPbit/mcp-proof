@@ -43,6 +43,8 @@ def render_html(model: dict) -> str:
         verdict_pass=model["verdict"]["ship_ready"],
         blockers=model["verdict"]["blockers"],
         next_steps=model["next_steps"],
+        audit_status=model["audit"]["status"],
+        audit_error=model["audit"]["error"],
     )
 
 
@@ -61,13 +63,18 @@ def build_report(
     json_path: str | Path | None = None,
     junit_path: str | Path | None = None,
     sarif_path: str | Path | None = None,
+    audit_error: str | None = None,
 ) -> Path:
     """regression: None when the lane didn't run, else
     {"summary": dict from replayer.summarize, "drifts": [DriftResult-like],
-     "fixtures_sha256": str, "action_yaml": str, "fixtures_dir": str}
+     "fixtures_sha256": str, "action_yaml": str, "fixtures_dir": str,
+     "baseline_created": bool}
 
     msss: pre-computed evaluate_msss() dict; when None (the default) it is
     derived from the conformance + security results.
+
+    audit_error: set when mcp-proof's own machinery failed — renders the
+    report INCONCLUSIVE instead of blaming the target.
     """
     model = build_model(
         server_name=server_name,
@@ -79,6 +86,7 @@ def build_report(
         msss=msss,
         protocol_era=protocol_era,
         discovery=discovery,
+        audit_error=audit_error,
     )
 
     out = Path(out_path)

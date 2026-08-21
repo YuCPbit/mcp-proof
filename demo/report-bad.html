@@ -29,7 +29,11 @@
              font-weight: 650; font-size: 14px; border: 1px solid; margin-bottom: 22px; }
   .verdict.pass { color: var(--good-text); border-color: var(--good); background: rgba(12,163,12,.08); }
   .verdict.fail { color: var(--critical); border-color: var(--critical); background: rgba(208,59,59,.07); }
+  .verdict.inconclusive { color: var(--ink-2); border-color: var(--warning); background: rgba(250,178,25,.10); }
   .verdict .why { font-weight: 400; color: var(--ink-2); }
+  .scope { background: var(--card); border: 1px solid var(--ring); border-radius: 10px;
+           padding: 12px 16px; margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+  .scope b { color: var(--ink); }
   .meta { display: grid; grid-template-columns: 150px 1fr; gap: 4px 16px; font-size: 13px;
           background: var(--card); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; }
   .meta dt { color: var(--ink-3); } .meta dd { margin: 0; word-break: break-all; }
@@ -131,7 +135,7 @@
 
   <dl class="meta">
     <dt>Server under test</dt><dd class="mono">.venv/bin/python demo/bad_server.py</dd>
-    <dt>Generated</dt><dd>2026-08-21 16:32 UTC · mcp-proof v0.7.0</dd>
+    <dt>Generated</dt><dd>2026-08-21 17:35 UTC · mcp-proof v0.7.1</dd>
     <dt>Protocol</dt><dd>negotiated <span class="mono">2025-03-26</span> · initialize-handshake era
        · <span class="note-warn">newer revision available: 2025-11-25</span></dd>
     <dt>Behaviour fingerprint</dt><dd class="mono">sha256:b6837784150c7f5242837ae8405d4217bef0beb89c8788542242da8314c874ae</dd>
@@ -156,6 +160,37 @@
       
     </div>
   </div>
+
+  <div class="scope">
+    <b>Evidence scope.</b> This report proves what was observed on the wire: protocol
+    conformance of the served surface, static analysis of advertised tool metadata. It does not assess
+    deployment, source code, process controls or authorization/OAuth flows — MSSS controls that
+    need such evidence are marked <i>manual review</i> (or <i>partial</i>), never assumed.
+  </div>
+
+  
+
+  
+  <h2 id="next-steps">Recommended next steps</h2>
+  <ol class="steps">
+    
+    <li><span class="prio p0">P0</span><span>LIFE-01 — Return protocolVersion, capabilities and serverInfo in the initialize result.</span></li>
+    
+    <li><span class="prio p0">P0</span><span>RPC-03 — Validate tools/call params and return an error when required fields are missing.</span></li>
+    
+    <li><span class="prio p0">P0</span><span>TOOL-03 — Fix the inputSchema so it validates under JSON Schema draft 2020-12.</span></li>
+    
+    <li><span class="prio p0">P0</span><span>TOOL-05 — Validate arguments against the inputSchema and reject calls missing required params.</span></li>
+    
+    <li><span class="prio p0">P0</span><span>HYG-01 — Send logs and banners to stderr; stdout is reserved for the protocol stream.</span></li>
+    
+    <li><span class="prio p0">P0</span><span>SEC-01 — Rewrite descriptions to describe tool behaviour; remove instructions aimed at the model.</span></li>
+    
+    <li><span class="prio p0">P0</span><span>SEC-02 — Strip zero-width, bidi-control and tag-block characters from tool names and descriptions.</span></li>
+    
+    <li><span class="prio p0">P0</span><span>SEC-03 — Remove embedded credentials from descriptions/schemas and rotate any real keys.</span></li>
+    
+  </ol>
 
   
 
@@ -894,26 +929,7 @@
 
   
 
-  <h2 id="next-steps">Recommended next steps</h2>
-  <ol class="steps">
-    
-    <li><span class="prio p0">P0</span><span>LIFE-01 — Return protocolVersion, capabilities and serverInfo in the initialize result.</span></li>
-    
-    <li><span class="prio p0">P0</span><span>RPC-03 — Validate tools/call params and return an error when required fields are missing.</span></li>
-    
-    <li><span class="prio p0">P0</span><span>TOOL-03 — Fix the inputSchema so it validates under JSON Schema draft 2020-12.</span></li>
-    
-    <li><span class="prio p0">P0</span><span>TOOL-05 — Validate arguments against the inputSchema and reject calls missing required params.</span></li>
-    
-    <li><span class="prio p0">P0</span><span>HYG-01 — Send logs and banners to stderr; stdout is reserved for the protocol stream.</span></li>
-    
-    <li><span class="prio p0">P0</span><span>SEC-01 — Rewrite descriptions to describe tool behaviour; remove instructions aimed at the model.</span></li>
-    
-    <li><span class="prio p0">P0</span><span>SEC-02 — Strip zero-width, bidi-control and tag-block characters from tool names and descriptions.</span></li>
-    
-    <li><span class="prio p0">P0</span><span>SEC-03 — Remove embedded credentials from descriptions/schemas and rotate any real keys.</span></li>
-    
-  </ol>
+  
 
   <footer>
     Reproducible audit — the behaviour fingerprint covers every check verdict and behavioural
@@ -921,7 +937,7 @@
     version — those live in the JSON model's separate <span class="mono">run_hash</span>).
     Re-run with identical server behaviour and the hash matches:
     <span class="mono">sha256:b6837784150c7f5242837ae8405d4217bef0beb89c8788542242da8314c874ae</span><br>
-    Generated by mcp-proof v0.7.0 · deterministic lanes only, no LLM judging ·
+    Generated by mcp-proof v0.7.1 · deterministic lanes only, no LLM judging ·
     MCP spec reference 2025-11-25 (initialize-handshake era)
   </footer>
 

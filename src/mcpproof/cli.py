@@ -11,11 +11,16 @@ def main(argv: list[str] | None = None) -> int:
                 stream.reconfigure(errors="replace")
             except Exception:
                 pass
+    from . import __version__
+
     parser = argparse.ArgumentParser(
         prog="mcp-proof",
         description="Ship an MCP server with a receipt: deterministic conformance, "
-        "security and regression audit with a client-ready delivery report.",
+        "security and regression audit with a client-ready delivery report. "
+        "Exit codes: 0 audit passed · 1 audit failed the target · "
+        "2 audit did not complete (never evidence against the target).",
     )
+    parser.add_argument("--version", action="version", version=f"mcp-proof {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run_p = sub.add_parser("run", help="Full audit and delivery report")
@@ -32,9 +37,12 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--sarif", default=None, help="Also write a SARIF 2.1.0 log here")
     run_p.add_argument("--fixtures", default=None, help="Fixtures dir; enables regression lane")
     run_p.add_argument("--server-name", default=None, help="Display name for the report")
+    # accepted for forward compatibility, hidden until the lane exists
+    run_p.add_argument("--semantic", action="store_true", help=argparse.SUPPRESS)
     run_p.add_argument(
-        "--semantic", action="store_true",
-        help="(reserved for a future release) opt-in LLM semantic lane",
+        "--record-if-missing", action="store_true",
+        help="Record a baseline when --fixtures has none. Default is to fail: "
+             "an audit must not silently create the contract it then verifies",
     )
     run_p.add_argument(
         "--include-destructive", action="store_true",
@@ -104,8 +112,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Exit non-zero on this class of change (default: breaking)",
     )
 
+    ver_p = sub.add_parser(
+        "verify",
+        help="Verify a JSON report's fingerprints offline (exit 1 if it was modified)",
+    )
+    ver_p.add_argument("report", help="Report model JSON (from `mcp-proof run --json ...`)")
+
     args = parser.parse_args(argv)
-    if args.command != "diff" and bool(args.server_cmd) == bool(args.url):
+    if args.command not in ("diff", "verify") and bool(args.server_cmd) == bool(args.url):
         parser.error("provide either a server command (stdio) or --url (HTTP), not both/neither")
 
     from .runner import dispatch  # deferred: keeps --help fast

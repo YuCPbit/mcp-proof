@@ -32,6 +32,68 @@ def _as_dicts(results: list) -> list[dict]:
     return [asdict(r) if is_dataclass(r) else dict(r) for r in results]
 
 
+def _non_latency_drifts(reg: dict | None) -> list[dict]:
+    # LATENCY rows carry live measurements — they stay out of every fingerprint
+    return [d for d in (reg or {}).get("drifts", []) if d.get("kind") != "LATENCY"]
+
+
+def _behavior_hash_input(negotiated_protocol, protocol_era, conf, sec, reg) -> dict:
+    return {
+        "negotiated_protocol": negotiated_protocol,
+        "protocol_era": protocol_era,
+        # verdicts only: evidence strings can embed stderr tails and other
+        # environment noise, so they belong to the audit hash, not this one
+        "conformance": [{"id": r["id"], "level": r["level"], "status": r["status"]}
+                        for r in conf],
+        "security": [{"id": r["id"], "level": r["level"], "status": r["status"]}
+                     for r in sec],
+        "regression": reg and {
+            "drifts": [{"fixture": d["fixture"], "tool": d["tool"],
+                        "kind": d["kind"], "detail": d["detail"]}
+                       for d in _non_latency_drifts(reg)],
+            "fixtures_sha256": reg.get("fixtures_sha256"),
+        },
+    }
+
+
+def _run_hash_input(tool_version, server_cmd, negotiated_protocol, protocol_era,
+                    conf, sec, reg) -> dict:
+    return {
+        "tool": {"name": "mcp-proof", "version": tool_version},
+        "server_cmd": server_cmd,
+        "negotiated_protocol": negotiated_protocol,
+        "protocol_era": protocol_era,
+        "conformance": conf,
+        "security": sec,
+        "regression": reg and {
+            "drifts": _non_latency_drifts(reg),
+            "fixtures_sha256": reg.get("fixtures_sha256"),
+        },
+    }
+
+
+def recompute_hashes(model: dict) -> tuple[str, str]:
+    """Recompute (behavior_sha256, run_hash) from a stored report model.
+
+    The JSON model is self-contained: every hash input is a field it carries,
+    so `mcp-proof verify` can prove offline that neither the verdicts nor the
+    recorded audit inputs were edited after the report was written. Keys are
+    canonicalized by obj_hash, so a JSON round-trip never changes the answer.
+    """
+    server = model["server"]
+    # pass the stored dicts through untouched: they are the very objects the
+    # build hashed, so any extra/missing key is a difference we WANT to catch
+    conf = model["conformance"]["checks"]
+    sec = model["security"]["checks"]
+    reg = model.get("regression")
+    behavior = obj_hash(_behavior_hash_input(server["revision"], server["era"], conf, sec, reg))
+    run = obj_hash(_run_hash_input(
+        model["tool"]["version"], server["cmd"], server["revision"], server["era"],
+        conf, sec, reg,
+    ))
+    return behavior, run
+
+
 def _level_score(results: list[dict], level: str) -> tuple[int, int]:
     scoped = [r for r in results if r["level"] == level and r["status"] != SKIP]
     ok = [r for r in scoped if r["status"] in (PASS, WARN)]
@@ -89,6 +151,7 @@ def build_model(
     msss: dict | None = None,
     protocol_era: str = "legacy",
     discovery: str | None = None,
+    audit_error: str | None = None,
 ) -> dict:
     conf = _as_dicts(conformance)
     sec = _as_dicts(security)
@@ -105,6 +168,9 @@ def build_model(
     sec_warns = sum(1 for r in sec if r["status"] == WARN)
 
     blockers: list[str] = []
+    if audit_error:
+        # the auditor failed, not the target: nothing below counts as evidence
+        blockers.append("audit did not complete — internal auditor error (not target behaviour)")
     if must_ok < must_total:
         blockers.append(f"{must_total - must_ok} MUST conformance check(s) failing")
     if sec_fails:
@@ -114,39 +180,12 @@ def build_model(
         drifting = s.get("breaking", 0) + s.get("value", 0) + s.get("error", 0)
         blockers.append(f"{drifting} behavioural drift(s)")
 
-    # LATENCY rows carry live measurements and the summary is derived data —
-    # both stay out of every fingerprint.
-    reg_drifts = [d for d in (reg or {}).get("drifts", []) if d.get("kind") != "LATENCY"]
     behavior_sha256 = obj_hash(
-        {
-            "negotiated_protocol": negotiated_protocol,
-            "protocol_era": protocol_era,
-            # verdicts only: evidence strings can embed stderr tails and other
-            # environment noise, so they belong to the audit hash, not this one
-            "conformance": [{"id": r["id"], "level": r["level"], "status": r["status"]}
-                            for r in conf],
-            "security": [{"id": r["id"], "level": r["level"], "status": r["status"]}
-                         for r in sec],
-            "regression": reg and {
-                "drifts": [{"fixture": d["fixture"], "tool": d["tool"],
-                            "kind": d["kind"], "detail": d["detail"]} for d in reg_drifts],
-                "fixtures_sha256": reg.get("fixtures_sha256"),
-            },
-        }
+        _behavior_hash_input(negotiated_protocol, protocol_era, conf, sec, reg)
     )
     run_hash = obj_hash(
-        {
-            "tool": {"name": "mcp-proof", "version": __version__},
-            "server_cmd": server_cmd,
-            "negotiated_protocol": negotiated_protocol,
-            "protocol_era": protocol_era,
-            "conformance": conf,
-            "security": sec,
-            "regression": reg and {
-                "drifts": reg_drifts,
-                "fixtures_sha256": reg.get("fixtures_sha256"),
-            },
-        }
+        _run_hash_input(__version__, server_cmd, negotiated_protocol, protocol_era,
+                        conf, sec, reg)
     )
 
     if protocol_era == "modern":
@@ -165,9 +204,25 @@ def build_model(
         else:
             protocol_note = ""
 
+    if audit_error:
+        next_steps = [{
+            "p": "P0",
+            "text": "Audit inconclusive — mcp-proof's own check logic failed, so nothing was "
+                    "proven about the target either way. Re-run the audit; if this reproduces, "
+                    "file the auditor error above as an mcp-proof bug.",
+        }]
+    else:
+        next_steps = _next_steps(conf, sec, reg)
+
     return {
         "report_schema_version": REPORT_SCHEMA_VERSION,
         "tool": {"name": "mcp-proof", "version": __version__},
+        # status/error stay out of both hashes: they describe this run's
+        # completeness, not the target's behaviour or the audit's inputs
+        "audit": {
+            "status": "inconclusive" if audit_error else "complete",
+            "error": audit_error or "",
+        },
         "behavior_sha256": behavior_sha256,
         "run_hash": run_hash,
         "server": {
@@ -192,7 +247,7 @@ def build_model(
         "security": {"checks": sec, "fails": sec_fails, "warns": sec_warns},
         "msss": msss,
         "regression": reg,
-        "next_steps": _next_steps(conf, sec, reg),
+        "next_steps": next_steps,
         # context, never hashed
         "observation": {"generated_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")},
     }

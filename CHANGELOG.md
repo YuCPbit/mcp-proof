@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.7.1 — 2026-08-22
+
+Release hardening: v0.7 taught the audit to fail closed on bad data; v0.7.1
+teaches it to fail closed on itself. Driven by a second external review
+(release-management focused) — every claim verified against the code before
+implementation; two scope corrections noted in the assessment report.
+
+- **Failure taxonomy — an auditor bug is never a target verdict.** `_safe`
+  now swallows only genuine transport failures (`TimeoutError`/`OSError`/
+  closed-pipe `ValueError`); any other exception in check logic surfaces as
+  an **INCONCLUSIVE** audit (`ConformanceOutcome.audit_error`) instead of the
+  previous behaviour, where the outer handler converted arbitrary internal
+  errors into "could not start probe" and failed the target with exit 1.
+  Exit codes now form a taxonomy: `0` passed · `1` the audit completed and
+  the target failed it · `2` the audit did not complete and proves nothing.
+  The JSON model and SARIF carry `audit.status` / `auditStatus`; the HTML
+  renders an "AUDIT INCONCLUSIVE" banner that blames nobody.
+- **Baselines fail closed.** `run --fixtures` no longer records a baseline
+  implicitly when none exists — a gate that can silently regenerate its own
+  contract (e.g. after a baseline is lost in CI) is not a gate. It now exits
+  `2` with instructions; `--record-if-missing` opts in explicitly, and a
+  baseline recorded in the same run labels itself "baseline recorded this
+  run — no historical comparison" in the tile, stdout and JSON
+  (`regression.baseline_created`) instead of posing as a regression verdict.
+  The `replay` path was already fail-closed via the v0.7 integrity gate.
+- **`mcp-proof verify report.json`.** The JSON model is self-contained, so
+  both fingerprints are recomputable offline: `verify` re-derives
+  `behavior_sha256` (verdicts) and `run_hash` (verdicts + evidence + auditor
+  version + command) from the report's own fields and exits `1` on any
+  post-audit edit — a flipped verdict and a rewritten evidence string are
+  caught by different fingerprints, and the output says which.
+- **Wording now matches the gate.** "Exit code 0 = zero security findings"
+  overstated a gate that only blocks FAILs; README (both languages) and the
+  report's verdict banner now say **no blocking security findings** —
+  matching the filesystem demo, which is SHIP-READY with one advisory.
+- **Report top fold.** New evidence-scope card states what the report proves
+  and what it never assesses (deployment, source, process, authorization) —
+  the MSSS partial/manual honesty, promoted to the first screen. On a
+  failing or inconclusive report, "Recommended next steps" moves above the
+  detail tables; on a passing one it stays at the end.
+- **README restructured.** Compressed first screen; new **Validation**
+  section (test count, 3-OS × 3-Python CI, wheel fresh-install smoke test,
+  official-SDK cross-validation); roadmap slimmed to Current/Next/Later with
+  history delegated to this file; new positioning section on how mcp-proof
+  relates to the official `modelcontextprotocol/conformance` suite, and an
+  explicit limitation: authorization/OAuth is out of scope.
+- Misc: `--version`; `--semantic` hidden (still accepted) until the lane
+  exists; `_find_chrome` checks Windows install roots so `--pdf` works
+  outside PATH; stale pyproject comment rewritten. 119 tests.
+
 ## 0.7.0 — 2026-08-22
 
 Integrity hardening: v0.1–v0.6 proved the tool can do a lot; v0.7 proves it knows
