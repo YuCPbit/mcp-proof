@@ -154,7 +154,7 @@ def _gate(problems) -> bool:
 
 def test_missing_fixture_fails_gate(recorded_baseline, tmp_path):
     fdir = _copy(recorded_baseline, tmp_path)
-    manifest = json.loads((fdir / "_manifest.json").read_text())
+    manifest = json.loads((fdir / "_manifest.json").read_text(encoding="utf-8"))
     victim = manifest["fixtures"][1]
     (fdir / victim).unlink()
     paths, problems = verify_fixture_set(fdir)
@@ -165,9 +165,9 @@ def test_missing_fixture_fails_gate(recorded_baseline, tmp_path):
 
 def test_tampered_fixture_content_fails_gate_and_is_not_replayed(recorded_baseline, tmp_path):
     fdir = _copy(recorded_baseline, tmp_path)
-    manifest = json.loads((fdir / "_manifest.json").read_text())
+    manifest = json.loads((fdir / "_manifest.json").read_text(encoding="utf-8"))
     victim = fdir / manifest["fixtures"][0]
-    fixture = json.loads(victim.read_text())
+    fixture = json.loads(victim.read_text(encoding="utf-8"))
     fixture["response"]["content"][0]["text"] = "silently rewritten baseline"
     victim.write_text(json.dumps(fixture), encoding="utf-8")
     paths, problems = verify_fixture_set(fdir)
@@ -179,7 +179,7 @@ def test_tampered_fixture_content_fails_gate_and_is_not_replayed(recorded_baseli
 def test_tampered_manifest_fingerprint_fails_gate(recorded_baseline, tmp_path):
     fdir = _copy(recorded_baseline, tmp_path)
     mpath = fdir / "_manifest.json"
-    manifest = json.loads(mpath.read_text())
+    manifest = json.loads(mpath.read_text(encoding="utf-8"))
     manifest["fixtures_sha256"] = "0" * 64
     mpath.write_text(json.dumps(manifest), encoding="utf-8")
     _, problems = verify_fixture_set(fdir)
@@ -190,7 +190,7 @@ def test_tampered_manifest_fingerprint_fails_gate(recorded_baseline, tmp_path):
 def test_duplicate_manifest_entry_is_an_error(recorded_baseline, tmp_path):
     fdir = _copy(recorded_baseline, tmp_path)
     mpath = fdir / "_manifest.json"
-    manifest = json.loads(mpath.read_text())
+    manifest = json.loads(mpath.read_text(encoding="utf-8"))
     manifest["fixtures"].append(manifest["fixtures"][0])
     mpath.write_text(json.dumps(manifest), encoding="utf-8")
     paths, problems = verify_fixture_set(fdir)
@@ -231,7 +231,7 @@ async def test_same_tool_same_args_twice_records_two_ordered_fixtures(tmp_path):
     paths = await record(REGRESSION_SERVER, tmp_path,
                          calls=[("echo", {"text": "hi"}), ("echo", {"text": "hi"})])
     assert len(paths) == 2 and paths[0].name != paths[1].name
-    manifest = json.loads((tmp_path / "_manifest.json").read_text())
+    manifest = json.loads((tmp_path / "_manifest.json").read_text(encoding="utf-8"))
     assert manifest["fixtures"] == [p.name for p in paths]
     results = await replay(REGRESSION_SERVER, tmp_path)
     assert summarize(results)["ok"] == 2
@@ -242,8 +242,8 @@ async def test_aggregate_fingerprint_is_order_sensitive(tmp_path):
     calls = [("echo", {"text": "hi"}), ("price", {"item": "x"})]
     await record(REGRESSION_SERVER, a, calls=calls)
     await record(REGRESSION_SERVER, b, calls=list(reversed(calls)))
-    ma = json.loads((a / "_manifest.json").read_text())
-    mb = json.loads((b / "_manifest.json").read_text())
+    ma = json.loads((a / "_manifest.json").read_text(encoding="utf-8"))
+    mb = json.loads((b / "_manifest.json").read_text(encoding="utf-8"))
     assert ma["fixtures_sha256"] != mb["fixtures_sha256"], (
         "save→get and get→save are different contracts"
     )
@@ -422,10 +422,10 @@ def test_behavior_hash_is_stable_across_environment_noise():
 
 
 def test_manifest_hash_recomputation_matches_recorded(recorded_baseline):
-    manifest = json.loads((recorded_baseline / "_manifest.json").read_text())
+    manifest = json.loads((recorded_baseline / "_manifest.json").read_text(encoding="utf-8"))
     hashes = []
     for name in manifest["fixtures"]:
-        fixture = json.loads((recorded_baseline / name).read_text())
+        fixture = json.loads((recorded_baseline / name).read_text(encoding="utf-8"))
         hashes.append(obj_hash(
             {"tool": fixture["tool"], "args": fixture["args"], "response": fixture["response"]}
         ))

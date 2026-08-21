@@ -13,7 +13,9 @@ from mcpproof.client_http import HttpProbe, open_session_http
 PYTHON = venv_python()
 SERVER = str(Path(__file__).resolve().parent / "http_target_server.py")
 
-BOOT_DEADLINE = 15.0
+# generous: shared CI runners (macOS especially) can take >15s to spawn a
+# Python process and bind a socket; a boot miss here fails CI, so err long
+BOOT_DEADLINE = 45.0
 
 
 def _free_port() -> int:

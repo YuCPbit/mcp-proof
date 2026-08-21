@@ -107,7 +107,8 @@ def modern_http_url():
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     try:
-        deadline = time.monotonic() + 15.0
+        # generous: shared macOS CI runners have twice missed a 15s boot
+        deadline = time.monotonic() + 45.0
         ready = False
         while time.monotonic() < deadline:
             if proc.poll() is not None:
@@ -157,7 +158,7 @@ async def test_record_and_replay_against_modern_server(tmp_path):
     import json
 
     price_fixture = json.loads(
-        next(p for p in paths if "__price__" in p.name).read_text()
+        next(p for p in paths if "__price__" in p.name).read_text(encoding="utf-8")
     )
     assert price_fixture["response"]["structured"] == {"total": 42.0, "currency": "USD"}
     assert price_fixture["contract_sha256"]

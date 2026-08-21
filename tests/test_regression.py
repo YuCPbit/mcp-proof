@@ -179,7 +179,7 @@ def test_is_destructive_heuristic():
 async def test_record_skips_destructive_by_default(tmp_path):
     skipped = []
     paths = await record(server_cmd(), tmp_path, skipped_out=skipped)
-    assert {json.loads(p.read_text())["tool"] for p in paths} == {"echo", "price", "policy"}
+    assert {json.loads(p.read_text(encoding="utf-8"))["tool"] for p in paths} == {"echo", "price", "policy"}
     assert skipped == ["wipe_data"]
     manifest = json.loads((tmp_path / "_manifest.json").read_text(encoding="utf-8"))
     assert manifest["skipped_destructive"] == ["wipe_data"]
@@ -187,7 +187,8 @@ async def test_record_skips_destructive_by_default(tmp_path):
 
 async def test_record_includes_destructive_on_request(tmp_path):
     paths = await record(server_cmd(), tmp_path, include_destructive=True)
-    assert {json.loads(p.read_text())["tool"] for p in paths} == {"echo", "price", "policy", "wipe_data"}
+    tools = {json.loads(p.read_text(encoding="utf-8"))["tool"] for p in paths}
+    assert tools == {"echo", "price", "policy", "wipe_data"}
 
 
 async def test_record_edge_cases_baseline_boundary_inputs(tmp_path):

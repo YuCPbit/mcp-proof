@@ -33,7 +33,7 @@ def _run(tmp_path, server_cmd, expect_exit):
 def test_all_output_formats_clean_server(tmp_path):
     html_path, paths = _run(tmp_path, MODERN, expect_exit=0)
 
-    model = json.loads(paths["json"].read_text())
+    model = json.loads(paths["json"].read_text(encoding="utf-8"))
     assert model["report_schema_version"] == 2
     assert model["verdict"]["ship_ready"] is True
     assert model["server"]["era"] == "modern"
@@ -42,21 +42,21 @@ def test_all_output_formats_clean_server(tmp_path):
     assert model["regression"]["summary"]["gate_pass"] is True
     assert {c["id"] for c in model["conformance"]["checks"]} >= {"DISC-01", "RES-01", "PROMPT-01"}
 
-    suites = ET.fromstring(paths["junit"].read_text())
+    suites = ET.fromstring(paths["junit"].read_text(encoding="utf-8"))
     by_name = {s.get("name"): s for s in suites}
     assert set(by_name) == {"conformance", "security", "regression"}
     assert all(s.get("failures") == "0" for s in by_name.values())
     assert int(by_name["conformance"].get("tests")) == len(model["conformance"]["checks"])
     assert int(by_name["conformance"].get("skipped")) > 0  # HTTP-01 on stdio
 
-    sarif = json.loads(paths["sarif"].read_text())
+    sarif = json.loads(paths["sarif"].read_text(encoding="utf-8"))
     assert sarif["version"] == "2.1.0"
     run = sarif["runs"][0]
     assert run["tool"]["driver"]["name"] == "mcp-proof"
     assert run["properties"]["shipReady"] is True
     assert all(r["level"] != "error" for r in run["results"])
 
-    html = html_path.read_text()
+    html = html_path.read_text(encoding="utf-8")
     assert 'id="conformance"' in html and 'id="RPC-01"' in html
     assert 'data-filter="attention"' in html
     assert "msss-body" in html
@@ -74,17 +74,17 @@ def test_all_output_formats_bad_server(tmp_path):
     )
     assert proc.returncode == 1, proc.stdout + proc.stderr
 
-    model = json.loads(jpath.read_text())
+    model = json.loads(jpath.read_text(encoding="utf-8"))
     assert model["verdict"]["ship_ready"] is False
     assert model["verdict"]["blockers"]
 
-    suites = ET.fromstring(xpath.read_text())
+    suites = ET.fromstring(xpath.read_text(encoding="utf-8"))
     conf = next(s for s in suites if s.get("name") == "conformance")
     assert int(conf.get("failures")) > 0
     # planted injection strings must survive XML escaping and parse back
-    assert "DROP TABLE" not in xpath.read_text() or True
+    assert "DROP TABLE" not in xpath.read_text(encoding="utf-8") or True
 
-    sarif = json.loads(spath.read_text())
+    sarif = json.loads(spath.read_text(encoding="utf-8"))
     errors = [r for r in sarif["runs"][0]["results"] if r["level"] == "error"]
     assert errors, "bad server must produce error-level SARIF results"
     rule_ids = {r["id"] for r in sarif["runs"][0]["tool"]["driver"]["rules"]}
@@ -95,7 +95,7 @@ def test_json_model_behavior_hash_matches_html(tmp_path):
     # the HTML shows the behaviour fingerprint; the audit-run hash (which also
     # covers auditor version + launch command) lives in the JSON model
     _, paths = _run(tmp_path, MODERN, expect_exit=0)
-    model = json.loads(paths["json"].read_text())
-    html = (tmp_path / "r.html").read_text()
+    model = json.loads(paths["json"].read_text(encoding="utf-8"))
+    html = (tmp_path / "r.html").read_text(encoding="utf-8")
     assert model["behavior_sha256"] in html
     assert model["run_hash"] not in html
