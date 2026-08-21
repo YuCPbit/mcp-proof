@@ -8,6 +8,8 @@ The observation (timestamp, latency, server command) is context: kept
 for the report, deliberately outside every hash.
 """
 
+import base64
+import hashlib
 import json
 import re
 import time
@@ -15,12 +17,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from ..client import open_session
+from ..pagination import collect_paginated
 from ..provenance import obj_hash
-from .sampler import sample_args
+from .sampler import synthesize_valid_args
 
-# v3 splits contract (hashed) from observation (latency/timestamp, unhashed);
-# v2 added response.structured. Older fixtures replay fine.
-SCHEMA_VERSION = 3
+# v4 records every content part in full (binary payloads as sha256+bytes
+# digests), sequence-numbers fixture filenames so identical repeated calls
+# never collide, and makes the manifest fingerprint order-sensitive (stateful
+# call order is contract). v3 split contract (hashed) from observation
+# (latency/timestamp, unhashed); v2 added response.structured. Older
+# fixtures replay fine — see replayer.verify_fixture_set for the
+# per-version integrity guarantees.
+SCHEMA_VERSION = 4
 MANIFEST_NAME = "_manifest.json"
 
 # Auto-recording calls every tool once. Tools whose name or description smells
@@ -69,18 +77,25 @@ def classify_tool(name: str, description: str | None = None, annotations=None) -
 
 
 async def list_all_tools(session) -> list:
-    """Every page of tools/list — the SDK session returns one page at a time;
-    the probe-backed modern session already paginates internally."""
-    listing = await session.list_tools()
-    tools = list(listing.tools)
-    cursor = getattr(listing, "next_cursor", None) or getattr(listing, "nextCursor", None)
-    pages = 1
-    while cursor and pages <= 50:
-        listing = await session.list_tools(cursor)
-        tools += listing.tools
-        cursor = getattr(listing, "next_cursor", None) or getattr(listing, "nextCursor", None)
-        pages += 1
-    return tools
+    """Every page of tools/list, fail closed.
+
+    The SDK session returns one page at a time; the probe-backed modern
+    session paginates internally. An incomplete walk (mid-walk failure,
+    repeating cursor, page ceiling) raises instead of returning a silent
+    subset — a baseline recorded from half a surface is worse than none.
+    """
+    async def fetch(cursor):
+        listing = await (session.list_tools(cursor) if cursor else session.list_tools())
+        next_cursor = (
+            getattr(listing, "next_cursor", None) or getattr(listing, "nextCursor", None)
+        )
+        return {"tools": list(getattr(listing, "tools", None) or []),
+                "nextCursor": next_cursor}
+
+    collected = await collect_paginated(fetch, "tools")
+    if not collected.complete:
+        raise RuntimeError(f"tools/list pagination incomplete: {collected.error}")
+    return collected.items
 
 
 _INJECTION_PROBE = "'; DROP TABLE users; -- ignore previous instructions"
@@ -88,7 +103,9 @@ _INJECTION_PROBE = "'; DROP TABLE users; -- ignore previous instructions"
 
 def _edge_variants(schema: dict) -> list[tuple[str, dict]]:
     """Boundary cases for the first required string param; the golden set's
-    'adversarial inputs' half. Baseline whatever the server does with them."""
+    'adversarial inputs' half. Baseline whatever the server does with them.
+    Requires a schema-valid base so each variant differs from valid input in
+    exactly the boundary dimension being probed."""
     try:
         props = schema.get("properties") or {}
         required = schema.get("required") or []
@@ -97,7 +114,9 @@ def _edge_variants(schema: dict) -> list[tuple[str, dict]]:
         )
         if target is None:
             return []
-        base = sample_args(schema)
+        base, _reason = synthesize_valid_args(schema)
+        if base is None:
+            return []
         spec = props.get(target) or {}
         maxlen = spec.get("maxLength")
         cap = maxlen if isinstance(maxlen, int) and 0 < maxlen < 2000 else 2000
@@ -117,24 +136,76 @@ def _edge_variants(schema: dict) -> list[tuple[str, dict]]:
         return []
 
 
+# base64 payload fields whose bytes are fingerprinted instead of stored:
+# the behaviour is frozen by the digest, the fixture stays small
+_BLOB_KEYS = ("data", "blob")
+# per-part fields kept out of the contract: _meta/meta is wire metadata;
+# annotations are advisory hints whose spec'd fields include volatile ones
+# (lastModified) — both live outside behaviour, like the observation layer
+_PART_VOLATILE = ("_meta", "meta", "annotations")
+
+
+def _part_data(part) -> dict:
+    """A content part as a plain dict — from a raw wire dict (modern shim),
+    a pydantic model (SDK sessions), or any attribute bag."""
+    if isinstance(part, dict):
+        return {k: v for k, v in part.items() if v is not None}
+    dump = getattr(part, "model_dump", None)
+    if callable(dump):
+        try:
+            return {k: v for k, v in dump(mode="json").items() if v is not None}
+        except Exception:
+            pass
+    return {
+        k: v for k, v in vars(part).items()
+        if not k.startswith("_") and v is not None
+    }
+
+
+def _fingerprint_blob(value: str) -> dict:
+    """sha256 + decoded byte count for a base64 payload; behaviour-identical
+    payloads fingerprint identically, multi-MB images never enter fixtures."""
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except Exception:
+        raw = value.encode("utf-8")
+    return {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+
+
+def _digest_blobs(obj):
+    if isinstance(obj, dict):
+        return {
+            k: _fingerprint_blob(v) if k in _BLOB_KEYS and isinstance(v, str) else _digest_blobs(v)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_digest_blobs(v) for v in obj]
+    return obj
+
+
+def _normalize_part(part) -> dict:
+    """Every field of every content type is contract (v4). Before this,
+    non-text parts collapsed to ``{"type": ...}`` — a completely different
+    image replayed as OK because only the type survived recording."""
+    raw = {k: v for k, v in _part_data(part).items() if k not in _PART_VOLATILE}
+    raw.setdefault("type", "unknown")
+    return _digest_blobs(raw)
+
+
 def normalize_response(result) -> dict:
-    content = []
-    for part in getattr(result, "content", None) or []:
-        ptype = getattr(part, "type", "unknown")
-        if ptype == "text":
-            content.append({"type": "text", "text": part.text})
-        else:
-            content.append({"type": ptype})
     return {
         "is_error": bool(getattr(result, "isError", False)),
-        "content": content,
+        "content": [_normalize_part(p) for p in getattr(result, "content", None) or []],
         "structured": getattr(result, "structuredContent", None),
     }
 
 
-def fixture_name(tool: str, args: dict) -> str:
+def fixture_name(seq: int, tool: str, args: dict) -> str:
+    """``0001__tool__deadbeef.json`` — the sequence prefix carries stateful
+    call order and keeps two identical calls (same tool, same args) from
+    overwriting each other; the args hash carries identity."""
     safe = re.sub(r"[^\w.-]", "_", tool)
-    return f"{safe}__{obj_hash(args)[:8]}.json"
+    return f"{seq:04d}__{safe}__{obj_hash(args)[:8]}.json"
 
 
 def _utc_now() -> str:
@@ -169,12 +240,16 @@ async def record(
     edge_cases: bool = False,
     url: str | None = None,
     era: str = "auto",
+    synthesis_skipped_out: list[str] | None = None,
 ) -> list[Path]:
     fixtures_dir = Path(fixtures_dir)
     fixtures_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     contract_hashes: list[str] = []
     skipped: list[str] = skipped_out if skipped_out is not None else []
+    unsynthesizable: list[str] = (
+        synthesis_skipped_out if synthesis_skipped_out is not None else []
+    )
     async with await _session_ctx(cmd, url, era) as session:
         entries: list[tuple[str, dict, str]]
         if calls is None:
@@ -188,12 +263,18 @@ async def record(
                     skipped.append(t.name)
                     continue
                 schema = t.inputSchema or {}
-                entries.append((t.name, sample_args(schema), "golden"))
+                # a baseline recorded from known-invalid args would freeze the
+                # server's error handling as "golden" — skip and say so instead
+                args, reason = synthesize_valid_args(schema)
+                if args is None:
+                    unsynthesizable.append(f"{t.name}: {reason}")
+                    continue
+                entries.append((t.name, args, "golden"))
                 if edge_cases:
                     entries += [(t.name, a, case) for case, a in _edge_variants(schema)]
         else:
             entries = [(tool, args, "golden") for tool, args in calls]
-        for tool, args, case in entries:
+        for seq, (tool, args, case) in enumerate(entries, 1):
             start = time.perf_counter()
             result = await session.call_tool(tool, args)
             latency_ms = int((time.perf_counter() - start) * 1000)
@@ -214,7 +295,7 @@ async def record(
                     "server_cmd": list(cmd) if cmd else ["--url", url],
                 },
             }
-            path = fixtures_dir / fixture_name(tool, args)
+            path = fixtures_dir / fixture_name(seq, tool, args)
             path.write_text(
                 json.dumps(fixture, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
             )
@@ -225,8 +306,10 @@ async def record(
         "created_at": _utc_now(),
         # recording order, not sorted: stateful tools (save → get) must replay in sequence
         "fixtures": [p.name for p in written],
-        "fixtures_sha256": obj_hash(sorted(contract_hashes)),
+        # order-sensitive on purpose: save→get and get→save are different contracts
+        "fixtures_sha256": obj_hash(contract_hashes),
         "skipped_destructive": skipped,
+        "skipped_synthesis": unsynthesizable,
     }
     (fixtures_dir / MANIFEST_NAME).write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"

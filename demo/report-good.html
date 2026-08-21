@@ -131,16 +131,16 @@
 
   <dl class="meta">
     <dt>Server under test</dt><dd class="mono">.venv/bin/python demo/good_server.py</dd>
-    <dt>Generated</dt><dd>2026-08-20 22:40 UTC · mcp-proof v0.6.0</dd>
+    <dt>Generated</dt><dd>2026-08-21 16:32 UTC · mcp-proof v0.7.0</dd>
     <dt>Protocol</dt><dd>negotiated <span class="mono">2025-11-25</span> · initialize-handshake era
        · <span class="note-warn">newest initialize-handshake revision</span></dd>
-    <dt>Run fingerprint</dt><dd class="mono">sha256:52ac235fd0778d3929911aeb8ec8548c0f021c8bf57f2270f2184fc6315e0262</dd>
+    <dt>Behaviour fingerprint</dt><dd class="mono">sha256:c1641a8b4d62ab67e9c73fcbc533630629144ff03cb4f64860843ea4bba0ba77</dd>
   </dl>
 
   <div class="tiles">
     <div class="tile" style="--tile-accent: var(--good)">
       <div class="k">Conformance</div>
-      <div class="v">16/16</div>
+      <div class="v">18/18</div>
       <div class="s">MUST checks passed · 6/7 SHOULD</div>
     </div>
     <div class="tile" style="--tile-accent: var(--good)">
@@ -192,7 +192,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">server answers tools/list after the initialized notification</div>
-          <div class="evidence">tools/list returned 4 tool(s) after initialized</div>
+          <div class="evidence">tools/list returned 4 tool(s) across 1 page(s) after initialized</div>
           
         </td>
       </tr>
@@ -301,7 +301,18 @@
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
-          <div class="title">declared outputSchemas compile and structured results match them</div>
+          <div class="title">declared outputSchemas compile as JSON Schema</div>
+          <div class="evidence">all 4 declared outputSchema(s) compile</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="TOOL-08" data-status="PASS">
+        <td class="id">TOOL-08</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">observed structuredContent matches the declared outputSchema</div>
           <div class="evidence">save_note structuredContent validates against its outputSchema</div>
           
         </td>
@@ -391,6 +402,17 @@
         <td>
           <div class="title">prompts/get rejects a call missing required arguments</div>
           <div class="evidence">no prompt declares required arguments</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="PROMPT-04" data-status="PASS">
+        <td class="id">PROMPT-04</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">prompts/list pagination terminates (no cursor loop)</div>
+          <div class="evidence">single page, no pagination cursor</div>
           
         </td>
       </tr>
@@ -517,9 +539,10 @@
   </table>
 
   <h2 id="msss">MSSS compliance</h2>
-  <p class="msss-lead"><b>L1: 2/2 auto-assessable controls met · 4 require manual review.</b>
+  <p class="msss-lead"><b>L1: 1/2 auto-assessable controls met · 1 partial · 4 require manual review.</b>
      Mapped against MSSS v0.1 (control-level mapping v2.0 (2026-01-20)): 3 of
-     24 controls are auto-assessable from this audit's deterministic checks; the remaining
+     24 controls are auto-assessable from this audit's deterministic checks
+     (partial = evidence ran clean but cannot prove the control on its own); the remaining
      21 need deployment, code or process evidence and are marked manual review — never assessed
      by this tool.
      <button class="msss-toggle" data-show="Show all 24 controls" data-hide="Collapse">Show all 24 controls</button></p>
@@ -598,17 +621,17 @@
         </td>
       </tr>
     
-      <tr id="MCP-LOG-02" data-status="PASS">
+      <tr id="MCP-LOG-02" data-status="WARN">
         <td class="id">MCP-LOG-02</td>
         <td class="level">Logging</td>
         <td class="level">L1</td>
-        <td><span class="badge pass">✓ met</span>
+        <td><span class="badge warn">◐ partial</span>
         </td>
         <td>
           <div class="title">Secret Redaction in Logs</div>
           <div class="fix"><b>Evidence checks:</b> SEC-03</div>
           
-          <div class="fix">Auto-assessed over advertised tool metadata; server log output is not inspected.</div>
+          <div class="fix">Supporting evidence only: SEC-03 scans advertised tool metadata for secret-like strings; server log output is not inspected, so a clean scan cannot prove log redaction (a leak still proves a gap).</div>
         </td>
       </tr>
     
@@ -876,91 +899,91 @@
     <tbody>
     
       <tr data-status="PASS">
-        <td class="id">save_note__4ba8cbdc.json</td>
+        <td class="id">0001__save_note__4ba8cbdc.json</td>
         <td>save_note</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">save_note__54555856.json</td>
+        <td class="id">0002__save_note__54555856.json</td>
         <td>save_note</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">save_note__e7d4dc7b.json</td>
+        <td class="id">0003__save_note__e7d4dc7b.json</td>
         <td>save_note</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">save_note__aaceaae6.json</td>
+        <td class="id">0004__save_note__aaceaae6.json</td>
         <td>save_note</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">get_note__d8a17f15.json</td>
+        <td class="id">0005__get_note__d8a17f15.json</td>
         <td>get_note</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">get_note__52187cd4.json</td>
+        <td class="id">0006__get_note__52187cd4.json</td>
         <td>get_note</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">get_note__cbfd3c9d.json</td>
+        <td class="id">0007__get_note__cbfd3c9d.json</td>
         <td>get_note</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">get_note__593a2b6d.json</td>
+        <td class="id">0008__get_note__593a2b6d.json</td>
         <td>get_note</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">calc_sum__54cb1b7a.json</td>
+        <td class="id">0009__calc_sum__54cb1b7a.json</td>
         <td>calc_sum</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">search_docs__38e762cf.json</td>
+        <td class="id">0010__search_docs__38e762cf.json</td>
         <td>search_docs</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">search_docs__450fd5d6.json</td>
+        <td class="id">0011__search_docs__450fd5d6.json</td>
         <td>search_docs</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">search_docs__b90f0eb6.json</td>
+        <td class="id">0012__search_docs__b90f0eb6.json</td>
         <td>search_docs</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">search_docs__fa61e7db.json</td>
+        <td class="id">0013__search_docs__fa61e7db.json</td>
         <td>search_docs</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
@@ -972,7 +995,7 @@
   <div class="leave">
     <h2>Leave-behind: your regression gate</h2>
     <p>The recorded fixtures (<span style="font-family:var(--mono)">demo/fixtures-good</span>,
-       suite fingerprint <span style="font-family:var(--mono)">sha256:b86a3f0fd0e169e592100735ef08afd721e9675912b9d400ea289f931e04896b</span>)
+       suite fingerprint <span style="font-family:var(--mono)">sha256:e65620e7252a2b6eaf0d36b78149b1d07ab9b86beb14cc687e5edd039086b1a1</span>)
        are the behavioural contract of this server. Keep them in the repository and run the workflow below in CI —
        any breaking or value drift fails the build before it reaches your users.</p>
     <pre># The recorded fixtures in demo/fixtures-good are the behavioral contract: any drift fails this job.
@@ -1004,11 +1027,12 @@ jobs:
   </ol>
 
   <footer>
-    Reproducible audit — the fingerprint covers every check outcome and behavioural replay verdict
-    (never timestamps or latency measurements).
+    Reproducible audit — the behaviour fingerprint covers every check verdict and behavioural
+    replay verdict (never timestamps, latency measurements, the launch command or the auditor's
+    version — those live in the JSON model's separate <span class="mono">run_hash</span>).
     Re-run with identical server behaviour and the hash matches:
-    <span class="mono">sha256:52ac235fd0778d3929911aeb8ec8548c0f021c8bf57f2270f2184fc6315e0262</span><br>
-    Generated by mcp-proof v0.6.0 · deterministic lanes only, no LLM judging ·
+    <span class="mono">sha256:c1641a8b4d62ab67e9c73fcbc533630629144ff03cb4f64860843ea4bba0ba77</span><br>
+    Generated by mcp-proof v0.7.0 · deterministic lanes only, no LLM judging ·
     MCP spec reference 2025-11-25 (initialize-handshake era)
   </footer>
 

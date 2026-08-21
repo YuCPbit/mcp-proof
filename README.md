@@ -8,7 +8,7 @@
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](pyproject.toml)
-[![checks](https://img.shields.io/badge/checks-30_modern_·_25_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
+[![checks](https://img.shields.io/badge/checks-32_modern_·_27_legacy_·_6_security-6a5acd)](src/mcpproof/checks/)
 [![transports](https://img.shields.io/badge/transports-stdio_·_HTTP-informational)](src/mcpproof/client_http.py)
 [![license](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
@@ -16,7 +16,7 @@
 
 <img src="demo/report-filesystem.png" width="760" alt="mcp-proof delivery report for the official MCP filesystem server — SHIP-READY, 11/11 MUST checks, full MSSS compliance table, 34/34 replays clean">
 
-*A real audit of the official MCP filesystem server: 25 conformance checks, MSSS compliance table, 34 regression fixtures — all green.*
+*A real audit of the official MCP filesystem server: 27 conformance checks, the MSSS compliance table, 34 regression replays — ship-ready, one advisory finding.*
 
 </div>
 
@@ -24,13 +24,13 @@
 
 ## ✨ What you get
 
-- 🔍 **Wire-level protocol checks across every surface and both eras** — mcp-proof speaks raw JSON-RPC to your server and auto-detects its era: 30 checks for the 2026-07-28 modern era (`server/discover`, `_meta` envelope enforcement, `resultType`, `ttlMs`/`cacheScope` on every cacheable result, `-32022` version rejection, HTTP routing-header enforcement) and 25 for the initialize-handshake era — exact error codes, schema validity, structured output, stdout hygiene, pagination safety, dedicated resources & prompts lanes, and **verified negative probes**: TOOL-07 sends inputs that provably violate the declared inputSchema and warns when the server answers them normally, quoting the minimal reproducer. Capability-aware in both directions: surfaces a server does not advertise are skipped, surfaces it does advertise must work.
-- 🛡️ **Security audit tied to a public standard** — 6 deterministic checks (tool-description poisoning, invisible/bidi characters, leaked credentials, unconstrained injection surfaces, advertised shell execution), each mapped to canonical control IDs of the 24-control [MCP Server Security Standard](https://mcp-security-standard.org), rendered as a full compliance table in every report.
-- 📼 **A regression suite your client keeps** — records in either protocol era; golden fixtures with SHA-256 provenance freeze the server's behaviour; replay grades every drift (`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`), understands structured output, preserves stateful call order, and ships with a ready-to-paste GitHub Actions gate.
-- 📄 **A report for humans *and* machines** — self-contained HTML with sticky navigation, per-check anchors (`report.html#SEC-03`), attention/passed filters and a collapsible MSSS matrix; `--pdf` for print. The same versioned model ships as `--json` (schema v1), `--junit` for any CI, and `--sarif` for the GitHub Security tab.
-- 🔁 **Reproducible by design** — zero LLM calls, zero API keys. Every hash is computed from behaviour alone — timestamps and latency live in a separate, unhashed observation layer — so identical server behaviour produces an identical report fingerprint and acceptance is verification, not trust.
+- 🔍 **Wire-level protocol checks across every surface, every page, both eras** — mcp-proof speaks raw JSON-RPC to your server and auto-detects its era: 32 checks for the 2026-07-28 modern era (`server/discover`, `_meta` envelope enforcement, `resultType`, `ttlMs`/`cacheScope` on every cacheable result, `-32022` version rejection, HTTP routing-header enforcement) and 27 for the initialize-handshake era — exact error codes, schema validity, structured output, stdout hygiene, pagination safety on all three list surfaces, dedicated resources & prompts lanes, and **verified negative probes**: TOOL-07 sends inputs that provably violate the declared inputSchema (a schema-valid baseline with exactly one field mutated) and warns when the server answers them normally — and treats a hang as its own finding, never as rejection. One pagination collector feeds every lane, so a tool hidden on page 2 is audited exactly like a tool on page 1. Capability-aware in both directions: surfaces a server does not advertise are skipped, surfaces it does advertise must work.
+- 🛡️ **Security audit tied to a public standard** — 6 deterministic checks (tool-description poisoning, invisible/bidi characters, leaked credentials, unconstrained injection surfaces, advertised shell execution) over every advertised tool on every page, with a schema walker that sees through `$ref`/`allOf`/nesting/array items — `config.shell.command` cannot hide one level down. Each check maps to canonical control IDs of the 24-control [MCP Server Security Standard](https://mcp-security-standard.org), rendered as a full compliance table whose verdicts never outrun their evidence: full direct proof says **met**, clean-but-indirect evidence says **partial**, and a control the checks cannot see says **manual review**.
+- 📼 **A regression suite your client keeps — and that verifies itself before it judges anyone** — records in either protocol era; golden fixtures freeze the server's behaviour with SHA-256 provenance, including every content type (binary payloads as digests, so a swapped image can never replay as OK). Before replaying, an integrity gate recomputes every contract hash and the manifest fingerprint: a missing, tampered, duplicated or stale fixture fails the gate instead of being silently skipped. Replay grades every drift (`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`) — any structured or JSON value change is at least `VALUE`, a flipped `"approved"→"denied"` can never pass as cosmetic — preserves stateful call order (sequence-numbered fixtures, order-sensitive fingerprint), and ships with a ready-to-paste GitHub Actions gate.
+- 📄 **A report for humans *and* machines** — self-contained HTML with sticky navigation, per-check anchors (`report.html#SEC-03`), attention/passed filters and a collapsible MSSS matrix; `--pdf` for print. The same versioned model ships as `--json` (schema v2), `--junit` for any CI, and `--sarif` for the GitHub Security tab.
+- 🔁 **Reproducible by design** — zero LLM calls, zero API keys. Two fingerprints, honestly separated: `behavior_sha256` is computed from server behaviour alone (check verdicts, replay verdicts, protocol facts — never timestamps, latency, the launch command or the auditor's version), so identical server behaviour fingerprints identically on any machine; `run_hash` additionally freezes what this audit run consisted of. Acceptance is verification, not trust.
 - 🧯 **Annotations-first call planning** — MCP tool annotations outrank the name heuristic in both directions: `readOnlyHint` rescues read-only tools the regex would over-block, `destructiveHint` catches mutators it would miss; unannotated tools fall back to the conservative heuristic. `mcp-proof plan` shows exactly what auto-baselining would call and on what basis, before anything touches production; `--include-destructive` and `--edge-cases` opt into more.
-- 📋 **A contract diff for CI** — `mcp-proof inspect` freezes the served surface (capabilities + tools + resources + prompts, fully paginated) into a fingerprinted manifest; `mcp-proof diff` classifies every change as `BREAKING` / `ADDITIVE` / `METADATA` and exits non-zero on breaking ones — schema tightening, enum narrowing, required-flips, removed output fields and weakened safety annotations all count.
+- 📋 **A contract diff for CI** — `mcp-proof inspect` freezes the served surface (capabilities + tools + resources + prompts, fully paginated, absent-vs-empty recorded) into a fingerprinted manifest — and refuses to write one at all if any pagination walk cannot be completed, because half a surface frozen as "the baseline" makes every later diff against the missing half invisible. Volatile wire metadata is removed by location, never by key name, so a schema property that happens to be called `ttlMs` or `nextCursor` stays part of the contract. `mcp-proof diff` classifies every change as `BREAKING` / `ADDITIVE` / `METADATA` and exits non-zero on breaking ones — schema tightening, enum narrowing, required-flips, removed output fields and weakened safety annotations all count.
 
 ## 🚀 Quick start
 
@@ -63,9 +63,9 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | Target | Verdict | Report |
 |---|---|---|
 | **Official MCP filesystem server** (`@modelcontextprotocol/server-filesystem`) | ✅ SHIP-READY — 11/11 MUST checks, 34/34 replays clean, 4 write tools auto-skipped | [HTML](demo/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
-| **2026-07-28 modern-era server** (zero-dep, cross-validated against the official v2 SDK) | ✅ SHIP-READY — era auto-detected via `server/discover`, 21/21 MUST incl. negative probes, 2/2 replays | [HTML](demo/report-modern.html) |
+| **2026-07-28 modern-era server** (zero-dep, cross-validated against the official v2 SDK) | ✅ SHIP-READY — era auto-detected via `server/discover`, 23/23 MUST incl. negative probes, 2/2 replays | [HTML](demo/report-modern.html) |
 | Demo server with **9 planted violations** | ❌ NOT SHIP-READY — 5 MUST failures + 3 security findings, every one caught with evidence | [HTML](demo/report-bad.html) |
-| Well-behaved demo server | ✅ SHIP-READY — 16/16 MUST, full three-lane pass incl. regression baseline | [HTML](demo/report-good.html) |
+| Well-behaved demo server | ✅ SHIP-READY — 18/18 MUST, full three-lane pass incl. regression baseline | [HTML](demo/report-good.html) |
 
 ## 🔬 The three lanes
 
@@ -127,6 +127,7 @@ Building a server rather than auditing one? [`templates/server-starter/`](templa
 | v0.4 | ✅ Capability-aware resources & prompts lanes · contract manifest `inspect` / `diff` with a breaking-change gate · annotations-first call plan |
 | v0.5 | ✅ Versioned JSON report model · JUnit & SARIF outputs · reusable GitHub Action (`uses: YuCPbit/mcp-proof@v0.5.0`) · report UI: sticky nav, anchors, filters |
 | v0.6 | ✅ Two-phase argument synthesis (`$ref` / `allOf` / `const` / `pattern` / `format` / bounds / `multipleOf`) · verified schema-violating negative probes (TOOL-07) with minimal reproducers |
+| v0.7 | ✅ Integrity hardening — one fail-closed pagination collector for every lane (page-2 violations audited; prompts pagination check PROMPT-04) · fixture-set integrity gate (recomputed contract hashes, manifest fingerprint, missing/tampered/stale/duplicate all fail) · normalization v4 (all content types recorded, binary digests, structured/JSON value changes ≥ `VALUE`, Decimal-exact numbers) · synthesized args validated before any call, negative probes prove their baseline · TOOL-06/08 static-dynamic split, timeouts are never "rejection" · deep schema walker for the security lane · MSSS `partial` verdicts · split `behavior_sha256` / `run_hash` |
 | Later | Opt-in semantic lane (LLM-graded assertions) — parked until the deterministic core is complete |
 
 ## 🔍 Limitations

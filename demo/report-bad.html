@@ -131,10 +131,10 @@
 
   <dl class="meta">
     <dt>Server under test</dt><dd class="mono">.venv/bin/python demo/bad_server.py</dd>
-    <dt>Generated</dt><dd>2026-08-20 22:40 UTC · mcp-proof v0.6.0</dd>
+    <dt>Generated</dt><dd>2026-08-21 16:32 UTC · mcp-proof v0.7.0</dd>
     <dt>Protocol</dt><dd>negotiated <span class="mono">2025-03-26</span> · initialize-handshake era
        · <span class="note-warn">newer revision available: 2025-11-25</span></dd>
-    <dt>Run fingerprint</dt><dd class="mono">sha256:80680554fc84298f1b081f4721ca7a380ce66d952bb1c20daafff705ac3457c5</dd>
+    <dt>Behaviour fingerprint</dt><dd class="mono">sha256:b6837784150c7f5242837ae8405d4217bef0beb89c8788542242da8314c874ae</dd>
   </dl>
 
   <div class="tiles">
@@ -192,7 +192,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">server answers tools/list after the initialized notification</div>
-          <div class="evidence">tools/list returned 4 tool(s) after initialized</div>
+          <div class="evidence">tools/list returned 4 tool(s) across 1 page(s) after initialized</div>
           
         </td>
       </tr>
@@ -301,7 +301,18 @@
         <td class="level">MUST</td>
         <td><span class="badge skip">– SKIP</span></td>
         <td>
-          <div class="title">declared outputSchemas compile and structured results match them</div>
+          <div class="title">declared outputSchemas compile as JSON Schema</div>
+          <div class="evidence">no tool declares an outputSchema</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="TOOL-08" data-status="SKIP">
+        <td class="id">TOOL-08</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">observed structuredContent matches the declared outputSchema</div>
           <div class="evidence">no tool declares an outputSchema</div>
           
         </td>
@@ -391,6 +402,17 @@
         <td>
           <div class="title">prompts/get rejects a call missing required arguments</div>
           <div class="evidence">no prompt declares required arguments</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="PROMPT-04" data-status="SKIP">
+        <td class="id">PROMPT-04</td>
+        <td class="level">MUST</td>
+        <td><span class="badge skip">– SKIP</span></td>
+        <td>
+          <div class="title">prompts/list pagination terminates (no cursor loop)</div>
+          <div class="evidence">no surface to paginate</div>
           
         </td>
       </tr>
@@ -519,7 +541,8 @@
   <h2 id="msss">MSSS compliance</h2>
   <p class="msss-lead"><b>L1: 0/2 auto-assessable controls met · 4 require manual review.</b>
      Mapped against MSSS v0.1 (control-level mapping v2.0 (2026-01-20)): 3 of
-     24 controls are auto-assessable from this audit's deterministic checks; the remaining
+     24 controls are auto-assessable from this audit's deterministic checks
+     (partial = evidence ran clean but cannot prove the control on its own); the remaining
      21 need deployment, code or process evidence and are marked manual review — never assessed
      by this tool.
      <button class="msss-toggle" data-show="Show all 24 controls" data-hide="Collapse">Show all 24 controls</button></p>
@@ -608,7 +631,7 @@
           <div class="title">Secret Redaction in Logs</div>
           <div class="fix"><b>Evidence checks:</b> SEC-03</div>
           <div class="evidence">failing checks: SEC-03</div>
-          <div class="fix">Auto-assessed over advertised tool metadata; server log output is not inspected.</div>
+          <div class="fix">Supporting evidence only: SEC-03 scans advertised tool metadata for secret-like strings; server log output is not inspected, so a clean scan cannot prove log redaction (a leak still proves a gap).</div>
         </td>
       </tr>
     
@@ -626,11 +649,11 @@
         </td>
       </tr>
     
-      <tr id="MCP-INPUT-02" data-status="PASS">
+      <tr id="MCP-INPUT-02" data-status="WARN">
         <td class="id">MCP-INPUT-02</td>
         <td class="level">Input Validation</td>
         <td class="level">L2</td>
-        <td><span class="badge pass">✓ met</span>
+        <td><span class="badge warn">◐ partial</span>
         </td>
         <td>
           <div class="title">Input Bounds Enforcement</div>
@@ -893,11 +916,12 @@
   </ol>
 
   <footer>
-    Reproducible audit — the fingerprint covers every check outcome and behavioural replay verdict
-    (never timestamps or latency measurements).
+    Reproducible audit — the behaviour fingerprint covers every check verdict and behavioural
+    replay verdict (never timestamps, latency measurements, the launch command or the auditor's
+    version — those live in the JSON model's separate <span class="mono">run_hash</span>).
     Re-run with identical server behaviour and the hash matches:
-    <span class="mono">sha256:80680554fc84298f1b081f4721ca7a380ce66d952bb1c20daafff705ac3457c5</span><br>
-    Generated by mcp-proof v0.6.0 · deterministic lanes only, no LLM judging ·
+    <span class="mono">sha256:b6837784150c7f5242837ae8405d4217bef0beb89c8788542242da8314c874ae</span><br>
+    Generated by mcp-proof v0.7.0 · deterministic lanes only, no LLM judging ·
     MCP spec reference 2025-11-25 (initialize-handshake era)
   </footer>
 

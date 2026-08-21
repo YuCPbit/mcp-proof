@@ -32,7 +32,7 @@ def render_html(model: dict) -> str:
         protocol_verb=model["protocol"]["verb"],
         era_label=model["protocol"]["era_label"],
         spec_reference=model["protocol"]["spec_reference"],
-        run_hash=model["run_hash"],
+        behavior_sha256=model["behavior_sha256"],
         conformance=conf["checks"],
         must_ok=conf["must_ok"], must_total=conf["must_total"],
         should_ok=conf["should_ok"], should_total=conf["should_total"],

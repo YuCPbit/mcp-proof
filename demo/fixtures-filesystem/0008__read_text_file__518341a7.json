@@ -1,0 +1,29 @@
+{
+  "schema_version": 4,
+  "tool": "read_text_file",
+  "case": "empty-string",
+  "args": {
+    "path": ""
+  },
+  "response": {
+    "is_error": true,
+    "content": [
+      {
+        "type": "text",
+        "text": "EISDIR: illegal operation on a directory, read"
+      }
+    ],
+    "structured": null
+  },
+  "contract_sha256": "89587b2c12d8bbec476f12821fb04376b8ad253e7c599de604877764f30ad541",
+  "observation": {
+    "latency_ms": 0,
+    "recorded_at": "2026-08-21T16:27:23.788124+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
+}

@@ -60,9 +60,11 @@ class RawProbe:
         return self
 
     async def __aexit__(self, *exc) -> None:
-        for task in (self._reader_task, self._stderr_task):
-            if task:
-                task.cancel()
+        tasks = [t for t in (self._reader_task, self._stderr_task) if t]
+        for task in tasks:
+            task.cancel()
+        if tasks:  # await the cancellations so teardown never races the readers
+            await asyncio.gather(*tasks, return_exceptions=True)
         if self._proc and self._proc.returncode is None:
             self._proc.terminate()
             try:
@@ -106,11 +108,14 @@ class RawProbe:
                 self.server_messages.append(msg)
             else:
                 self.server_messages.append(msg)
-        # stdout EOF: the server is gone; fail waiters now instead of
-        # letting each pending request ride out its full timeout
+        # stdout EOF: the server is gone; fail waiters now instead of letting
+        # each pending request ride out its full timeout. set_exception, not
+        # cancel(): cancelling the future would be indistinguishable from the
+        # caller's own task being cancelled, and request() must swallow only
+        # the former while letting real cancellation propagate.
         for fut in self._pending.values():
             if not fut.done():
-                fut.cancel()
+                fut.set_exception(ConnectionError("server closed stdout before responding"))
         self._pending.clear()
 
     async def _read_stderr(self) -> None:
@@ -130,7 +135,9 @@ class RawProbe:
         self, method: str, params: dict | None = None, timeout: float | None = None
     ) -> dict | None:
         """Send a request; return the raw response envelope, or None on
-        timeout, closed transport, or dead server process."""
+        timeout, closed transport, or dead server process. The caller's own
+        cancellation (asyncio.CancelledError) propagates — an async library
+        must never convert it into a value."""
         self._next_id += 1
         req_id = self._next_id
         fut: asyncio.Future = asyncio.get_running_loop().create_future()
@@ -144,9 +151,10 @@ class RawProbe:
         try:
             await self._write(msg)
             resp = await asyncio.wait_for(fut, timeout or self.timeout)
-        except (TimeoutError, asyncio.CancelledError, OSError):
-            self._pending.pop(req_id, None)
+        except (TimeoutError, OSError):  # ConnectionError (dead server) is an OSError
             return None
+        finally:
+            self._pending.pop(req_id, None)
         if isinstance(resp, dict) and isinstance(resp.get("result"), dict):
             self.observed_results.append((method, resp["result"]))
         return resp

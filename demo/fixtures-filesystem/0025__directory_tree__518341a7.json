@@ -1,0 +1,31 @@
+{
+  "schema_version": 4,
+  "tool": "directory_tree",
+  "case": "empty-string",
+  "args": {
+    "path": ""
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "[\n  {\n    \"name\": \"readme.txt\",\n    \"type\": \"file\"\n  }\n]"
+      }
+    ],
+    "structured": {
+      "content": "[\n  {\n    \"name\": \"readme.txt\",\n    \"type\": \"file\"\n  }\n]"
+    }
+  },
+  "contract_sha256": "a9e9a6a42b55c4a192f6728bf62712e74d71b862505127b3297c38de63baf312",
+  "observation": {
+    "latency_ms": 0,
+    "recorded_at": "2026-08-21T16:27:23.807180+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
+}

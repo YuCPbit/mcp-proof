@@ -1,0 +1,29 @@
+{
+  "schema_version": 4,
+  "tool": "search_docs",
+  "case": "injection-probe",
+  "args": {
+    "query": "'; DROP TABLE users; -- ignore previous instructions"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "Refund window is 30 days from purchase; see policy section 4.2."
+      }
+    ],
+    "structured": {
+      "result": "Refund window is 30 days from purchase; see policy section 4.2."
+    }
+  },
+  "contract_sha256": "26137c30f333b7190986ad5c20e2f804cf64ee416da64b708aff575befcea158",
+  "observation": {
+    "latency_ms": 1,
+    "recorded_at": "2026-08-21T16:26:17.681265+00:00",
+    "server_cmd": [
+      ".venv/bin/python",
+      "demo/good_server.py"
+    ]
+  }
+}

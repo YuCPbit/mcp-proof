@@ -1,0 +1,29 @@
+{
+  "schema_version": 4,
+  "tool": "get_note",
+  "case": "golden",
+  "args": {
+    "title": "example"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "example"
+      }
+    ],
+    "structured": {
+      "result": "example"
+    }
+  },
+  "contract_sha256": "b2aca87ccc27431a921165d5a43945028af5e1f8bd06a43d2e24759898f7fccf",
+  "observation": {
+    "latency_ms": 2,
+    "recorded_at": "2026-08-21T16:26:17.667080+00:00",
+    "server_cmd": [
+      ".venv/bin/python",
+      "demo/good_server.py"
+    ]
+  }
+}

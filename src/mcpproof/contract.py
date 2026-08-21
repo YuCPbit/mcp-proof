@@ -6,23 +6,31 @@ classifies what changed between two snapshots — BREAKING / ADDITIVE /
 METADATA — forming the static half of the acceptance gate (record/replay is
 the behavioural half).
 
-Hashing follows the fixture discipline: ``contract_sha256`` covers the
-behaviourally meaningful surface only; volatile fields (``_meta``,
-``resultType``, ``ttlMs``, ``cacheScope``, cursors, timestamps, server
-version) stay outside it, so identical surface reproduces an identical hash.
+Two fail-closed guarantees:
+
+* volatile wire metadata is removed by **location**, never by key name —
+  result-level fields (``nextCursor``, ``ttlMs``, ``cacheScope``,
+  ``resultType``, ``_meta``) never enter the manifest because only the item
+  lists are extracted, and the only key stripped from an item is its own
+  top-level ``_meta``. A user's schema property that happens to be called
+  ``ttlMs`` or ``nextCursor`` is contract and is preserved verbatim.
+* an incomplete pagination walk (mid-walk failure, repeating cursor, page
+  ceiling) aborts the capture — ``inspect`` refuses to freeze half a surface
+  as if it were the whole baseline.
 """
 
 from . import LATEST_SPEC
 from .era import LEGACY, MODERN, parse_discover_result, sniff_era
+from .pagination import PaginatedResult, collect_paginated
 from .provenance import obj_hash
 
-MANIFEST_VERSION = 1
+# v2: schema payloads preserved verbatim (volatile stripping is by wire
+# location, not key name), plus the hashed `unserved` surface list.
+MANIFEST_VERSION = 2
 
 BREAKING = "BREAKING"
 ADDITIVE = "ADDITIVE"
 METADATA = "METADATA"
-
-_VOLATILE_KEYS = frozenset({"_meta", "resultType", "ttlMs", "cacheScope", "nextCursor"})
 
 _SURFACES = (
     ("tools", "tools/list"),
@@ -31,34 +39,34 @@ _SURFACES = (
 )
 
 
-def _strip(obj):
-    """Recursively drop volatile wire fields; what remains is contract."""
-    if isinstance(obj, dict):
-        return {k: _strip(v) for k, v in obj.items() if k not in _VOLATILE_KEYS}
-    if isinstance(obj, list):
-        return [_strip(v) for v in obj]
-    return obj
+def _strip_item(item):
+    """Drop the item's own top-level ``_meta`` (wire metadata); everything
+    below — inputSchema, outputSchema, annotations — is opaque contract."""
+    if isinstance(item, dict):
+        return {k: v for k, v in item.items() if k != "_meta"}
+    return item
 
 
-async def _list_surface(probe, method: str, key: str) -> list | None:
-    """All pages of a list endpoint, or None when the surface is unavailable."""
-    items: list = []
-    cursor = None
-    for _ in range(51):
+async def _list_surface(probe, method: str, key: str) -> PaginatedResult | None:
+    """Every page of a list endpoint; None when the surface is not served
+    (the first request errors out). A walk that starts but cannot finish
+    comes back with ``complete=False`` for the caller to refuse."""
+    try:
+        first = await probe.request(method)
+    except Exception:
+        return None
+    if first is None or not isinstance(first.get("result"), dict):
+        return None
+
+    async def fetch(cursor):
         try:
             resp = await probe.request(method, {"cursor": cursor} if cursor else None)
         except Exception:
-            resp = None
-        if resp is None or "result" not in resp:
-            return items if items else None
-        page = resp["result"]
-        raw = page.get(key)
-        if isinstance(raw, list):
-            items += [x for x in raw if isinstance(x, dict)]
-        cursor = page.get("nextCursor")
-        if not cursor:
-            break
-    return items
+            return None
+        result = resp.get("result") if isinstance(resp, dict) else None
+        return result if isinstance(result, dict) else None
+
+    return await collect_paginated(fetch, key, first_page=first["result"])
 
 
 def _probe_ctx(cmd: list[str] | None, url: str | None):
@@ -105,11 +113,25 @@ async def capture_manifest(
                       "era": LEGACY, "revision": result.get("protocolVersion")}
 
         surfaces: dict[str, list] = {}
+        unserved: list[str] = []
         for key, method in _SURFACES:
             listed = await _list_surface(probe, method, key)
-            surfaces[key] = _strip(listed) if listed is not None else []
+            if listed is None:
+                surfaces[key] = []  # surface not served — recorded in `unserved`
+                unserved.append(key)
+                continue
+            if not listed.complete:
+                # fail closed: a partial listing frozen as "the baseline" would
+                # make every later diff against the missing pages invisible
+                raise RuntimeError(
+                    f"{method} pagination incomplete ({listed.error}) — "
+                    "refusing to write a partial contract manifest"
+                )
+            surfaces[key] = [_strip_item(x) for x in listed.items if isinstance(x, dict)]
 
-    contract = {"capabilities": _strip(capabilities), **surfaces}
+    # `unserved` distinguishes "surface absent" from "surface served but
+    # empty" — both used to collapse into []
+    contract = {"capabilities": _strip_item(capabilities), "unserved": sorted(unserved), **surfaces}
     return {
         "manifest_version": MANIFEST_VERSION,
         "server": server,
@@ -133,6 +155,12 @@ def _change(changes: list, level: str, ref: str, detail: str) -> None:
 def diff_manifests(base: dict, current: dict) -> list[dict]:
     changes: list[dict] = []
     _diff_capabilities(base.get("capabilities") or {}, current.get("capabilities") or {}, changes)
+    if "unserved" in base and "unserved" in current:  # both v2+: absent ≠ empty
+        base_un, cur_un = set(base["unserved"] or []), set(current["unserved"] or [])
+        for key in sorted(cur_un - base_un):
+            _change(changes, BREAKING, f"surface {key}", "surface no longer served")
+        for key in sorted(base_un - cur_un):
+            _change(changes, ADDITIVE, f"surface {key}", "surface now served")
     _diff_named(base.get("tools") or [], current.get("tools") or [],
                 "tool", "name", changes, _diff_tool)
     _diff_named(base.get("resources") or [], current.get("resources") or [],
@@ -169,10 +197,11 @@ def _diff_named(old: list, new: list, kind: str, id_key: str, changes: list, ite
 
 
 def _diff_tool(old: dict, new: dict, ref: str, changes: list) -> None:
-    _diff_schema(f"{ref}.inputSchema", old.get("inputSchema"), new.get("inputSchema"),
-                 changes, side="input")
-    _diff_schema(f"{ref}.outputSchema", old.get("outputSchema"), new.get("outputSchema"),
-                 changes, side="output")
+    # deliberately the same policy for input and output schemas: every rule
+    # below is conservative in the caller's favour (tightening = BREAKING);
+    # true consumer-compatibility variance for outputs is future work
+    _diff_schema(f"{ref}.inputSchema", old.get("inputSchema"), new.get("inputSchema"), changes)
+    _diff_schema(f"{ref}.outputSchema", old.get("outputSchema"), new.get("outputSchema"), changes)
     if (old.get("description") or "") != (new.get("description") or ""):
         _change(changes, METADATA, ref, "description changed")
     old_ann = old.get("annotations") or {}
@@ -225,7 +254,7 @@ _TIGHTEN = (  # (key, breaking when new value moves this way)
 )
 
 
-def _diff_schema(path: str, old, new, changes: list, side: str) -> None:
+def _diff_schema(path: str, old, new, changes: list) -> None:
     if old == new:
         return
     if old is None:
@@ -268,7 +297,7 @@ def _diff_schema(path: str, old, new, changes: list, side: str) -> None:
         if name not in new_req:  # newly-required already reported above
             _change(changes, ADDITIVE, f"{path}.{name}", "optional property added")
     for name in sorted(set(old_props) & set(new_props)):
-        _diff_schema(f"{path}.{name}", old_props[name], new_props[name], changes, side)
+        _diff_schema(f"{path}.{name}", old_props[name], new_props[name], changes)
 
     for key, tightened in _TIGHTEN:
         o, n = old.get(key), new.get(key)
@@ -290,7 +319,7 @@ def _diff_schema(path: str, old, new, changes: list, side: str) -> None:
                 f"multipleOf changed: {old.get('multipleOf')!r} → {new.get('multipleOf')!r}")
 
     if isinstance(old.get("items"), dict) or isinstance(new.get("items"), dict):
-        _diff_schema(f"{path}[]", old.get("items"), new.get("items"), changes, side)
+        _diff_schema(f"{path}[]", old.get("items"), new.get("items"), changes)
 
     if len(changes) == before:
         # not equal, but nothing rule-worthy surfaced — never hide a change

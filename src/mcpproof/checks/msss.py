@@ -13,14 +13,17 @@ Group (https://mcp-security-standard.org/); the delivery report renders the
 required attribution.
 
 Honesty contract: a control is only ever assessed automatically ("auto")
-when mcp-proof's deterministic checks produce direct evidence for it from
+when mcp-proof's deterministic checks produce evidence for it from
 tools/list metadata or probe behaviour. Everything else is "manual" and is
-reported as not auto-assessable — never as passed.
+reported as not auto-assessable — never as passed. "met" is reserved for
+full direct evidence: when mapped checks were skipped, produced warnings,
+or the control's automated evidence is only *supporting* (it corroborates
+but cannot prove the control), the verdict is capped at "partial".
 """
 
 from dataclasses import dataclass
 
-from .base import FAIL, PASS, SKIP, CheckResult
+from .base import FAIL, PASS, SKIP, WARN, CheckResult
 
 MSSS_VERSION = "v0.1"
 MSSS_MAPPING_VERSION = "control-level mapping v2.0 (2026-01-20)"
@@ -30,8 +33,12 @@ AUTO = "auto"
 MANUAL = "manual"
 
 MET = "met"
+PARTIAL = "partial"
 GAP = "gap"
 MANUAL_REVIEW = "manual"
+
+DIRECT = "direct"
+SUPPORTING = "supporting"
 
 _LEVELS = ("L1", "L2", "L3", "L4")
 
@@ -43,9 +50,12 @@ class Control:
     min_level is the compliance level that first requires the control
     (levels are cumulative: L2 includes all L1 controls, and so on).
     checks lists the mcp-proof check IDs whose outcomes evidence the
-    control when assessment == "auto". note is a static scope caveat
-    rendered alongside the verdict so partial evidence is never
-    presented as a full assessment.
+    control when assessment == "auto". evidence_strength says how far that
+    evidence reaches: "direct" evidence can prove the control met;
+    "supporting" evidence can only corroborate it (a clean scan caps the
+    verdict at "partial") — though a failing check still proves a gap
+    either way. note is a static scope caveat rendered alongside the
+    verdict so the evidence boundary is always visible.
     """
 
     id: str
@@ -55,6 +65,7 @@ class Control:
     assessment: str
     checks: tuple[str, ...] = ()
     note: str = ""
+    evidence_strength: str = DIRECT
 
 
 # Official matrix order (control-level-mapping.md, "Complete Control Matrix").
@@ -77,8 +88,10 @@ CONTROLS: list[Control] = [
     Control(
         "MCP-LOG-02", "Logging", "Secret Redaction in Logs", "L1", AUTO,
         checks=("SEC-03",),
-        note="Auto-assessed over advertised tool metadata; server log output "
-             "is not inspected.",
+        note="Supporting evidence only: SEC-03 scans advertised tool metadata "
+             "for secret-like strings; server log output is not inspected, so a "
+             "clean scan cannot prove log redaction (a leak still proves a gap).",
+        evidence_strength=SUPPORTING,
     ),
     # ---- Level 2 ----
     Control("MCP-SUPPLY-02", "Supply Chain", "Trusted Package Sources", "L2", MANUAL),
@@ -132,16 +145,20 @@ def evaluate_msss(check_results: list[CheckResult]) -> dict:
     """Map mcp-proof check outcomes onto the 24 MSSS controls.
 
     Per-control status:
-      "met"    — every mapped check that ran PASSed (WARN counts as met with
-                 its note text carried into the control's notes),
-      "gap"    — at least one mapped check FAILed,
-      "manual" — the control is not auto-assessable (or its mapped checks
-                 could not run), so it needs human/process evidence.
+      "met"     — every mapped check ran and PASSed, and the control's
+                  automated evidence is direct,
+      "partial" — evidence ran and nothing FAILed, but it cannot carry a full
+                  "met": some mapped checks were skipped, some WARNed, or the
+                  control's evidence is only supporting (e.g. MCP-LOG-02:
+                  a clean metadata scan cannot prove log redaction),
+      "gap"     — at least one mapped check FAILed,
+      "manual"  — the control is not auto-assessable (or its mapped checks
+                  could not run), so it needs human/process evidence.
 
     Accepts CheckResult dataclasses or equivalent dicts. Returns a dict with
     "controls" (matrix order), "level_summary" per L1-L4
-    ({auto_met, auto_gap, manual_count}), "overall" totals and an honest
-    one-line "headline" for L1.
+    ({auto_met, auto_partial, auto_gap, manual_count}), "overall" totals and
+    an honest one-line "headline" for L1.
     """
     outcomes: dict[str, tuple[str, str]] = {}
     for r in check_results:
@@ -157,6 +174,7 @@ def evaluate_msss(check_results: list[CheckResult]) -> dict:
             "title": c.title,
             "min_level": c.min_level,
             "assessment": c.assessment,
+            "evidence_strength": c.evidence_strength if c.assessment == AUTO else "",
             "checks": list(c.checks),
             "status": MANUAL_REVIEW,
             "notes": "",
@@ -165,22 +183,29 @@ def evaluate_msss(check_results: list[CheckResult]) -> dict:
         if c.assessment == AUTO:
             seen = {cid: outcomes[cid] for cid in c.checks if cid in outcomes}
             ran = {cid: (s, ev) for cid, (s, ev) in seen.items() if s != SKIP}
-            failing = [cid for cid, (s, _) in ran.items() if s == FAIL]
+            failing = sorted(cid for cid, (s, _) in ran.items() if s == FAIL)
+            warning = sorted(cid for cid, (s, _) in ran.items() if s == WARN)
+            not_run = sorted(set(c.checks) - set(ran))
             if failing:
                 entry["status"] = GAP
-                entry["notes"] = "failing checks: " + ", ".join(sorted(failing))
+                entry["notes"] = "failing checks: " + ", ".join(failing)
             elif not ran:
                 entry["status"] = MANUAL_REVIEW
                 entry["notes"] = "mapped checks did not run — automated evidence unavailable"
             else:
-                entry["status"] = MET
                 notes = [
                     f"{cid}: {ev}" for cid, (s, ev) in sorted(ran.items())
-                    if s not in (PASS, FAIL)  # WARN and friends: met with note
+                    if s not in (PASS, FAIL)  # carry WARN evidence into the row
                 ]
-                skipped = sorted(set(seen) - set(ran))
-                if skipped:
-                    notes.append("not run: " + ", ".join(skipped))
+                capped = []
+                if c.evidence_strength == SUPPORTING:
+                    capped.append("supporting evidence only")
+                if warning:
+                    capped.append("warnings: " + ", ".join(warning))
+                if not_run:
+                    capped.append("not run: " + ", ".join(not_run))
+                    notes.append("not run: " + ", ".join(not_run))
+                entry["status"] = PARTIAL if capped else MET
                 entry["notes"] = "; ".join(notes)
         controls.append(entry)
 
@@ -189,6 +214,7 @@ def evaluate_msss(check_results: list[CheckResult]) -> dict:
         scoped = [e for e in controls if e["min_level"] == lvl]
         level_summary[lvl] = {
             "auto_met": sum(1 for e in scoped if e["status"] == MET),
+            "auto_partial": sum(1 for e in scoped if e["status"] == PARTIAL),
             "auto_gap": sum(1 for e in scoped if e["status"] == GAP),
             "manual_count": sum(1 for e in scoped if e["status"] == MANUAL_REVIEW),
         }
@@ -196,15 +222,17 @@ def evaluate_msss(check_results: list[CheckResult]) -> dict:
     overall = {
         "total": len(controls),
         "auto_met": sum(1 for e in controls if e["status"] == MET),
+        "auto_partial": sum(1 for e in controls if e["status"] == PARTIAL),
         "auto_gap": sum(1 for e in controls if e["status"] == GAP),
         "manual": sum(1 for e in controls if e["status"] == MANUAL_REVIEW),
     }
 
     l1 = level_summary["L1"]
-    l1_auto = l1["auto_met"] + l1["auto_gap"]
+    l1_auto = l1["auto_met"] + l1["auto_partial"] + l1["auto_gap"]
     if l1_auto:
+        partial_bit = f" · {l1['auto_partial']} partial" if l1["auto_partial"] else ""
         headline = (
-            f"L1: {l1['auto_met']}/{l1_auto} auto-assessable controls met · "
+            f"L1: {l1['auto_met']}/{l1_auto} auto-assessable controls met{partial_bit} · "
             f"{l1['manual_count']} require manual review"
         )
     else:

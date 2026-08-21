@@ -1,11 +1,12 @@
 """Schema-violating inputs: does the server enforce what it declares?
 
-Each variant is the valid baseline from ``sample_args`` with exactly one
-field mutated past a declared constraint — a minimal reproducer by
-construction. Every candidate is verified against the schema with
-``jsonschema`` before it is offered: if it does not actually violate the
-declaration, it is discarded, so a TOOL-07 finding can never be an artifact
-of sloppy generation. Deterministic, like the sampler.
+Each variant is a *verified-valid* baseline with exactly one field mutated
+past a declared constraint — a minimal reproducer by construction. Both
+halves of that claim are proven with ``jsonschema`` before a variant is
+offered: the baseline must validate (otherwise the mutated field cannot be
+shown to be what makes the candidate invalid) and the candidate must not.
+If either proof fails, no variant is emitted — a TOOL-07 finding can never
+be an artifact of sloppy generation. Deterministic, like the sampler.
 """
 
 from jsonschema import Draft202012Validator
@@ -60,6 +61,13 @@ def negative_variants(schema: dict, limit: int = 2) -> list[tuple[str, dict]]:
     if not isinstance(schema, dict):
         return []
     base = sample_args(schema)
+    try:
+        if not Draft202012Validator(schema).is_valid(base):
+            # an invalid baseline cannot prove that the single mutated field
+            # is what makes the candidate invalid — no minimal reproducer
+            return []
+    except Exception:
+        return []
     props = schema.get("properties")
     props = props if isinstance(props, dict) else {}
     required = [r for r in (schema.get("required") or []) if isinstance(r, str)]

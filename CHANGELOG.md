@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.7.0 — 2026-08-22
+
+Integrity hardening: v0.1–v0.6 proved the tool can do a lot; v0.7 proves it knows
+when it must not quietly keep going. No new lanes — every change makes an existing
+verdict harder to fool. Driven by an external code review of v0.6.0 (all of whose
+findings reproduced) plus our own audit of the same code.
+
+- **One pagination discipline** (`pagination.py`): a single fail-closed collector
+  replaces four ad-hoc cursor walkers with three different page ceilings. Conformance,
+  security, contract capture and both recorders now audit **every page** of tools,
+  resources and prompts — a prompt-injection tool hidden on page 2 is seen exactly
+  like one on page 1. Repeating cursors and mid-walk failures are explicit outcomes,
+  never silent truncation. Prompts gained the pagination check the other surfaces
+  always had (**PROMPT-04**, MUST). Check counts: 32 modern · 27 legacy · 6 security.
+- **Fixture-set integrity gate** (`replayer.verify_fixture_set`): before anything
+  replays, every contract hash is recomputed and the manifest fingerprint verified.
+  A manifest-listed fixture missing from disk, a fixture edited after recording, a
+  tampered manifest fingerprint, duplicate entries, stale unlisted files, or a missing
+  manifest each produce an ERROR row that fails the gate — previously they were
+  silently skipped, alphabetized, or replayed out of order. Pre-v3 fixtures (no
+  stored hashes) still replay; their integrity is honestly reported as unverifiable.
+- **Fixture schema v4**: every content part is recorded in full (v3 collapsed
+  non-text parts to `{"type": ...}` — a completely different image replayed as OK);
+  binary payloads become `{sha256, bytes}` digests so behaviour is frozen without
+  megabytes in git. Fixture filenames carry a sequence prefix (`0001__tool__hash`),
+  so calling the same tool twice with the same args no longer overwrites the first
+  recording, and the manifest fingerprint is order-sensitive — `save→get` and
+  `get→save` are different contracts. v1–v3 fixtures replay unchanged.
+- **Drift semantics that respect machines**: any value change in `structuredContent`
+  — or in text that parses as JSON — is now at least `VALUE` and fails the gate;
+  `"approved"→"denied"` can never pass as COSMETIC again. Number comparison uses
+  `Decimal`, so a drifted 17-digit integer is no longer folded away by float precision.
+- **Synthesis is fail-closed**: `synthesize_valid_args` validates every generated
+  candidate against the schema before anything is called; unsatisfiable schemas are
+  reported (`skipped_synthesis` in the manifest, SKIP evidence in checks) instead of
+  being called with known-invalid arguments. Negative probes prove their baseline
+  valid first — without that, "exactly one field mutated" proves nothing.
+- **Evidence semantics**: TOOL-06 split into a static MUST (declared outputSchemas
+  compile) and **TOOL-08** (observed structuredContent validates; up to three safe
+  candidates tried; unobservable → SKIP with the reason — "unverified" can no longer
+  read as PASS). TOOL-07 no longer counts a timeout as rejection: a server that hangs
+  on invalid input is reported as exactly that, matching TOOL-04/05.
+- **Security lane sees the whole schema**: shared walker (`schemas.py`) resolves
+  `$ref`/`allOf` and descends nested objects, array items and `anyOf`/`oneOf`
+  branches — SEC-04/SEC-06 now flag `config.shell.command`, not just top-level params.
+- **MSSS verdicts never outrun evidence**: new `partial` status for controls whose
+  mapped checks were skipped or WARNed, and for controls whose automated evidence is
+  only *supporting* — MCP-LOG-02 ("Secret Redaction in Logs") is now capped at
+  partial from a clean metadata scan (a found secret still gaps it). A WARN like
+  SEC-04's "unconstrained injection-surface params" can no longer produce a `met`
+  for "Input Bounds Enforcement".
+- **Contract capture strips by wire location, not key name**: only an item's own
+  top-level `_meta` is removed — a user schema property named `ttlMs` or
+  `nextCursor` is contract and survives capture and diff (manifest v2, which also
+  records `unserved` so "surface absent" is distinguishable from "surface empty").
+  `inspect` refuses to write a manifest when any pagination walk is incomplete.
+  The dead `side` parameter of `_diff_schema` is gone.
+- **Two fingerprints** (report schema v2): `behavior_sha256` covers check/replay
+  verdicts and protocol facts only — reproducible across machines, shown in the
+  HTML; `run_hash` additionally freezes auditor version, launch command and full
+  evidence text. `RawProbe` now lets task cancellation propagate (dead-server
+  futures get `ConnectionError` instead of a cancel that masked real cancellation)
+  and awaits its reader tasks on exit.
+- **30 adversarial tests** (`tests/test_v07.py` + `paginated_surfaces_server.py`):
+  page-2 violations on all three surfaces, cursor loops, mid-walk failures, every
+  fixture-tampering vector, order-sensitive fingerprints, image-payload drift,
+  structured/JSON string flips, float-folding, invalid-baseline negative probes,
+  deep-schema injection surfaces, hash stability across environment noise. 107 total.
+
 ## 0.6.0 — 2026-08-21
 
 The sampler grows up, and the audit learns to ask the question schemas only imply:

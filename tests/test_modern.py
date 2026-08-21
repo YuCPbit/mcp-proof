@@ -152,11 +152,12 @@ async def test_record_and_replay_against_modern_server(tmp_path):
     from mcpproof.regression.replayer import replay, summarize
 
     paths = await record(modern_cmd(), tmp_path)
-    assert {p.name.split("__")[0] for p in paths} == {"echo", "price"}
+    # v4 fixture names: 0001__tool__args-hash.json — order prefix, then identity
+    assert {p.name.split("__")[1] for p in paths} == {"echo", "price"}
     import json
 
     price_fixture = json.loads(
-        next(p for p in paths if p.name.startswith("price")).read_text()
+        next(p for p in paths if "__price__" in p.name).read_text()
     )
     assert price_fixture["response"]["structured"] == {"total": 42.0, "currency": "USD"}
     assert price_fixture["contract_sha256"]

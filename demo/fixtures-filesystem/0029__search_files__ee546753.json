@@ -1,0 +1,32 @@
+{
+  "schema_version": 4,
+  "tool": "search_files",
+  "case": "empty-string",
+  "args": {
+    "path": "",
+    "pattern": "example"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "No matches found"
+      }
+    ],
+    "structured": {
+      "content": "No matches found"
+    }
+  },
+  "contract_sha256": "3bb03d9d298a2919274512ff5bc6ea544e87aa1a42905f7b9987e9f220601532",
+  "observation": {
+    "latency_ms": 5,
+    "recorded_at": "2026-08-21T16:27:23.814706+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
+}

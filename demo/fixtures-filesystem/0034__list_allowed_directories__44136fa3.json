@@ -1,0 +1,29 @@
+{
+  "schema_version": 4,
+  "tool": "list_allowed_directories",
+  "case": "golden",
+  "args": {},
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "Allowed directories:\n/tmp/mcp-proof-sandbox\n/private/tmp/mcp-proof-sandbox"
+      }
+    ],
+    "structured": {
+      "content": "Allowed directories:\n/tmp/mcp-proof-sandbox\n/private/tmp/mcp-proof-sandbox"
+    }
+  },
+  "contract_sha256": "715b6c98f6faa2f2f31f9596120157be580cd5f50afebed8c385f20569746c00",
+  "observation": {
+    "latency_ms": 0,
+    "recorded_at": "2026-08-21T16:27:23.818454+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
+}

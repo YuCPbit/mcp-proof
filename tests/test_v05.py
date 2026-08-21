@@ -34,10 +34,11 @@ def test_all_output_formats_clean_server(tmp_path):
     html_path, paths = _run(tmp_path, MODERN, expect_exit=0)
 
     model = json.loads(paths["json"].read_text())
-    assert model["report_schema_version"] == 1
+    assert model["report_schema_version"] == 2
     assert model["verdict"]["ship_ready"] is True
     assert model["server"]["era"] == "modern"
-    assert model["run_hash"]
+    assert model["run_hash"] and model["behavior_sha256"]
+    assert model["run_hash"] != model["behavior_sha256"]
     assert model["regression"]["summary"]["gate_pass"] is True
     assert {c["id"] for c in model["conformance"]["checks"]} >= {"DISC-01", "RES-01", "PROMPT-01"}
 
@@ -90,8 +91,11 @@ def test_all_output_formats_bad_server(tmp_path):
     assert any(r["ruleId"] in rule_ids for r in errors)
 
 
-def test_json_model_run_hash_matches_html(tmp_path):
+def test_json_model_behavior_hash_matches_html(tmp_path):
+    # the HTML shows the behaviour fingerprint; the audit-run hash (which also
+    # covers auditor version + launch command) lives in the JSON model
     _, paths = _run(tmp_path, MODERN, expect_exit=0)
     model = json.loads(paths["json"].read_text())
     html = (tmp_path / "r.html").read_text()
-    assert model["run_hash"] in html
+    assert model["behavior_sha256"] in html
+    assert model["run_hash"] not in html

@@ -7,11 +7,22 @@ declaration-strength order: local ``$ref`` resolution → ``const`` →
 ``format``, length/bound/``multipleOf``/item-count constraints. Unusable
 schemas yield ``{}`` rather than raise.
 
+The rules are heuristics and can miss (an unmatched ``pattern``, conflicting
+``allOf`` constraints, a ``oneOf`` branch constrained from outside), so
+nothing downstream may trust a synthesized candidate blindly: callers that
+are about to *call a live tool* or *prove a baseline valid* go through
+``synthesize_valid_args``, which validates the candidate against the schema
+itself and reports failure instead of shipping a known-invalid input.
+
 Everything here is deterministic — same schema, same args, every run.
 """
 
 import math
 import re
+
+from ..schemas import resolve
+
+__all__ = ["resolve", "sample_args", "synthesize_valid_args"]
 
 _MAX_DEPTH = 8
 
@@ -46,41 +57,27 @@ def sample_args(schema: dict) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def resolve(schema, root) -> dict:
-    """Follow a local ``$ref`` (``#/...``) and merge ``allOf`` into one
-    effective schema dict; anything unresolvable becomes ``{}``."""
-    seen = 0
-    while isinstance(schema, dict) and "$ref" in schema and seen < 16:
-        ref = schema["$ref"]
-        if not isinstance(ref, str) or not ref.startswith("#/"):
-            return {k: v for k, v in schema.items() if k != "$ref"}
-        target = root
-        for part in ref[2:].split("/"):
-            part = part.replace("~1", "/").replace("~0", "~")
-            if not isinstance(target, dict) or part not in target:
-                return {}
-            target = target[part]
-        extra = {k: v for k, v in schema.items() if k != "$ref"}
-        schema = {**target, **extra} if isinstance(target, dict) else {}
-        seen += 1
+def synthesize_valid_args(schema: dict) -> tuple[dict | None, str]:
+    """``(args, "")`` when synthesis produced schema-valid arguments,
+    ``(None, reason)`` otherwise.
+
+    This is the fail-closed entry point: a candidate the sampler could not
+    make valid is reported, never called — so a conformance finding or a
+    recorded baseline can never be an artifact of sloppy generation.
+    """
+    from jsonschema import Draft202012Validator
+
     if not isinstance(schema, dict):
-        return {}
-    subs = schema.get("allOf")
-    if isinstance(subs, list) and subs:
-        merged: dict = {k: v for k, v in schema.items() if k != "allOf"}
-        for sub in subs:
-            sub = resolve(sub, root)
-            for k, v in sub.items():
-                if k == "properties" and isinstance(v, dict):
-                    props = dict(merged.get("properties") or {})
-                    props.update(v)
-                    merged["properties"] = props
-                elif k == "required" and isinstance(v, list):
-                    merged["required"] = sorted(set(merged.get("required") or []) | set(v))
-                else:
-                    merged.setdefault(k, v)
-        schema = merged
-    return schema
+        return None, "inputSchema is not an object"
+    args = sample_args(schema)
+    try:
+        validator = Draft202012Validator(schema)
+        error = next(validator.iter_errors(args), None)
+    except Exception as exc:
+        return None, f"inputSchema does not compile: {exc}"
+    if error is not None:
+        return None, f"synthesized arguments do not satisfy the schema ({error.message})"
+    return args, ""
 
 
 def _sample(schema, depth, root):
@@ -141,7 +138,8 @@ def _sample_string(schema) -> str:
             for candidate in _PATTERN_CANDIDATES:
                 if compiled.fullmatch(candidate):
                     return candidate
-            # last resort: a fullmatch-able literal prefix beats a sure miss
+            # no candidate matches this pattern — the returned seed is a known
+            # miss; synthesize_valid_args catches it before anything is called
             return "example"
     fmt = schema.get("format")
     if isinstance(fmt, str) and fmt in _FORMAT_SEEDS:

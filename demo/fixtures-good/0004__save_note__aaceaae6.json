@@ -1,0 +1,30 @@
+{
+  "schema_version": 4,
+  "tool": "save_note",
+  "case": "empty-string",
+  "args": {
+    "title": "",
+    "text": "example"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "Saved note '' (7 chars)."
+      }
+    ],
+    "structured": {
+      "result": "Saved note '' (7 chars)."
+    }
+  },
+  "contract_sha256": "a27b19e7776da15315f3acb431a126646d9aaf48cf16c303f7b164ece510e694",
+  "observation": {
+    "latency_ms": 1,
+    "recorded_at": "2026-08-21T16:26:17.664045+00:00",
+    "server_cmd": [
+      ".venv/bin/python",
+      "demo/good_server.py"
+    ]
+  }
+}

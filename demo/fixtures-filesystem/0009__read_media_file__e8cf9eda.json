@@ -1,0 +1,29 @@
+{
+  "schema_version": 4,
+  "tool": "read_media_file",
+  "case": "golden",
+  "args": {
+    "path": "example"
+  },
+  "response": {
+    "is_error": true,
+    "content": [
+      {
+        "type": "text",
+        "text": "ENOENT: no such file or directory, open '/tmp/mcp-proof-sandbox/example'"
+      }
+    ],
+    "structured": null
+  },
+  "contract_sha256": "db9201a4462489bb28294908049990e1f60862c620d8ba74a005105555120891",
+  "observation": {
+    "latency_ms": 1,
+    "recorded_at": "2026-08-21T16:27:23.789402+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-filesystem",
+      "/tmp/mcp-proof-sandbox"
+    ]
+  }
+}

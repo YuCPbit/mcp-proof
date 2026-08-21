@@ -99,30 +99,48 @@ def test_evaluate_msss_bad_server_known_results():
     # tool-metadata integrity (poisoning) and secrets controls must be gaps
     assert by_id["MCP-INPUT-01"]["status"] == "gap"
     assert "SEC-01" in by_id["MCP-INPUT-01"]["notes"]
+    # supporting evidence can still prove a gap: a visible secret IS a leak
     assert by_id["MCP-LOG-02"]["status"] == "gap"
 
-    # SEC-04 WARN => met with the warning carried as a note
-    assert by_id["MCP-INPUT-02"]["status"] == "met"
+    # SEC-04 WARN: the scan itself found unconstrained params — a control
+    # named "Input Bounds Enforcement" can be at most partial on that evidence
+    assert by_id["MCP-INPUT-02"]["status"] == "partial"
     assert "unconstrained injection-surface params" in by_id["MCP-INPUT-02"]["notes"]
 
     # manual controls are never assessed
     assert by_id["MCP-AUTHZ-01"]["status"] == "manual"
     assert by_id["MCP-DEPLOY-04"]["status"] == "manual"
 
-    assert msss["level_summary"]["L1"] == {"auto_met": 0, "auto_gap": 2, "manual_count": 4}
-    assert msss["level_summary"]["L2"] == {"auto_met": 1, "auto_gap": 0, "manual_count": 5}
-    assert msss["level_summary"]["L3"] == {"auto_met": 0, "auto_gap": 0, "manual_count": 6}
-    assert msss["overall"] == {"total": 24, "auto_met": 1, "auto_gap": 2, "manual": 21}
+    assert msss["level_summary"]["L1"] == {
+        "auto_met": 0, "auto_partial": 0, "auto_gap": 2, "manual_count": 4,
+    }
+    assert msss["level_summary"]["L2"] == {
+        "auto_met": 0, "auto_partial": 1, "auto_gap": 0, "manual_count": 5,
+    }
+    assert msss["level_summary"]["L3"] == {
+        "auto_met": 0, "auto_partial": 0, "auto_gap": 0, "manual_count": 6,
+    }
+    assert msss["overall"] == {
+        "total": 24, "auto_met": 0, "auto_partial": 1, "auto_gap": 2, "manual": 21,
+    }
     assert msss["headline"] == "L1: 0/2 auto-assessable controls met · 4 require manual review"
 
 
-def test_evaluate_msss_all_pass_yields_met():
+def test_evaluate_msss_all_pass_yields_met_except_supporting_evidence():
     results = [_r(cid, PASS) for cid in (*CONFORMANCE_CHECKS, *SECURITY_CHECKS)]
     msss = evaluate_msss(results)
     statuses = {c["id"]: c["status"] for c in msss["controls"]}
     for c in CONTROLS:
-        assert statuses[c.id] == ("met" if c.assessment == "auto" else "manual")
-    assert msss["headline"] == "L1: 2/2 auto-assessable controls met · 4 require manual review"
+        if c.assessment != "auto":
+            assert statuses[c.id] == "manual"
+        elif c.evidence_strength == "supporting":
+            # e.g. MCP-LOG-02: a clean metadata scan cannot prove log redaction
+            assert statuses[c.id] == "partial", c.id
+        else:
+            assert statuses[c.id] == "met", c.id
+    assert msss["headline"] == (
+        "L1: 1/2 auto-assessable controls met · 1 partial · 4 require manual review"
+    )
 
 
 def test_evaluate_msss_skipped_checks_degrade_to_manual():
@@ -142,7 +160,7 @@ async def test_bad_server_live_msss_gaps(bad_server_cmd):
 
     assert by_id["MCP-INPUT-01"]["status"] == "gap"
     assert by_id["MCP-LOG-02"]["status"] == "gap"
-    assert by_id["MCP-INPUT-02"]["status"] == "met"
+    assert by_id["MCP-INPUT-02"]["status"] == "partial"
     assert "run_shell.cmd" in by_id["MCP-INPUT-02"]["notes"]
     assert msss["headline"] == "L1: 0/2 auto-assessable controls met · 4 require manual review"
 
@@ -175,8 +193,10 @@ def test_report_contains_msss_section_and_attribution(tmp_path):
     # all 24 controls rendered
     for control in CONTROLS:
         assert control.id in html
-    # the three verdict badges all appear, and manual is visibly distinct
+    # the verdict badges on this fixture set: gaps, one partial (SEC-04 WARN →
+    # MCP-INPUT-02 must not read "met"), and visibly distinct manual reviews
     assert "✗ gap" in html
-    assert "✓ met" in html
+    assert "◐ partial" in html
+    assert "✓ met" not in html, "nothing on the bad server earns a full met"
     assert "– manual review" in html
     assert "L1: 0/2 auto-assessable controls met · 4 require manual review" in html

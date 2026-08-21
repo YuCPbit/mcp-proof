@@ -1,10 +1,11 @@
 {
-  "schema_version": 3,
-  "created_at": "2026-08-20T22:42:18.673450+00:00",
+  "schema_version": 4,
+  "created_at": "2026-08-21T16:26:36.012858+00:00",
   "fixtures": [
-    "echo__88dfa77a.json",
-    "price__9b815a00.json"
+    "0001__echo__88dfa77a.json",
+    "0002__price__9b815a00.json"
   ],
-  "fixtures_sha256": "2a58e631a0d2f8d5cb29b5cd8282cc2c712307158d2a5a5603a711b4f4534166",
-  "skipped_destructive": []
+  "fixtures_sha256": "148a7604db8d311f8810750bd1d69cae6581dcaaf57a9c08d02632c50ad13c09",
+  "skipped_destructive": [],
+  "skipped_synthesis": []
 }

@@ -33,10 +33,10 @@ async def test_record_writes_provenance_stamped_fixtures(tmp_path):
     assert len(paths) == 3
     assert all(p.exists() and p.parent == tmp_path for p in paths)
     tools_seen = set()
-    for p in paths:
+    for seq, p in enumerate(paths, 1):
         fixture = json.loads(p.read_text(encoding="utf-8"))
         tools_seen.add(fixture["tool"])
-        assert fixture["schema_version"] == 3
+        assert fixture["schema_version"] == 4
         # the hashed layer depends on behaviour only
         assert fixture["contract_sha256"] == obj_hash(_contract(fixture))
         # the observation layer carries context and stays out of every hash
@@ -45,14 +45,16 @@ async def test_record_writes_provenance_stamped_fixtures(tmp_path):
         assert "recorded_at" in fixture["observation"]
         assert fixture["response"]["is_error"] is False
         assert fixture["response"]["content"][0]["type"] == "text"
-        assert p.name == f"{fixture['tool']}__{obj_hash(fixture['args'])[:8]}.json"
+        # sequence prefix carries stateful order; the args hash carries identity
+        assert p.name == f"{seq:04d}__{fixture['tool']}__{obj_hash(fixture['args'])[:8]}.json"
     assert tools_seen == {"echo", "price", "policy"}
     manifest = json.loads((tmp_path / "_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 3
+    assert manifest["schema_version"] == 4
     # manifest preserves recording order so stateful sequences replay correctly
     assert manifest["fixtures"] == [p.name for p in paths]
+    # the aggregate fingerprint is order-sensitive: save→get ≠ get→save
     recomputed = obj_hash(
-        sorted(obj_hash(_contract(json.loads(p.read_text(encoding="utf-8")))) for p in paths)
+        [obj_hash(_contract(json.loads(p.read_text(encoding="utf-8")))) for p in paths]
     )
     assert manifest["fixtures_sha256"] == recomputed
 
@@ -149,14 +151,17 @@ def test_github_action_yaml_is_a_paste_ready_gate():
 
 
 def test_replay_order_follows_manifest_not_alphabet(tmp_path):
-    from mcpproof.regression.replayer import _replay_order
+    from mcpproof.regression.replayer import verify_fixture_set
 
+    fixture = {"tool": "t", "args": {}, "response": {"is_error": False, "content": []}}
     for name in ("a_get.json", "z_save.json"):
-        (tmp_path / name).write_text("{}", encoding="utf-8")
+        (tmp_path / name).write_text(json.dumps(fixture), encoding="utf-8")
     (tmp_path / "_manifest.json").write_text(
         json.dumps({"fixtures": ["z_save.json", "a_get.json"]}), encoding="utf-8"
     )
-    assert [p.name for p in _replay_order(tmp_path)] == ["z_save.json", "a_get.json"]
+    paths, problems = verify_fixture_set(tmp_path)
+    assert [p.name for p in paths] == ["z_save.json", "a_get.json"]
+    assert problems == []
 
 
 def test_is_destructive_heuristic():
@@ -206,3 +211,12 @@ def test_structured_drift_classification():
     assert _structured_drift(old, {"structured": None})[0] == "BREAKING"
     assert _structured_drift(old, {"structured": {"total": 42, "currency": "USD"}}) is None
     assert _structured_drift({"is_error": False}, {"structured": {"x": 1}}) is None
+    # structured fields are machine-consumed: ANY value change is VALUE, even
+    # a plain string the date/number/negation scan has no opinion about
+    kind, detail = _structured_drift(old, {"structured": {"total": 42, "currency": "EUR"}})
+    assert kind == "VALUE"
+    assert "currency" in detail and "EUR" in detail
+    kind, detail = _structured_drift(
+        {"structured": {"status": "approved"}}, {"structured": {"status": "denied"}}
+    )
+    assert kind == "VALUE", "a flipped status string must never pass the gate as COSMETIC"

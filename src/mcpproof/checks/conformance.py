@@ -28,6 +28,7 @@ from ..era import (
     EraInfo,
     parse_discover_result,
 )
+from ..pagination import PaginatedResult, collect_paginated
 from .base import FAIL, MUST, PASS, SHOULD, SKIP, WARN, CheckResult
 
 DISCOVER_TIMEOUT = 8.0  # era probe: snappy fallback beats a full request timeout
@@ -163,15 +164,20 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
         "Return a nextCursor that advances and eventually ends; a repeating cursor hangs clients.",
     ),
     "TOOL-06": (
-        "declared outputSchemas compile and structured results match them",
+        "declared outputSchemas compile as JSON Schema",
         MUST,
-        "Ship a structuredContent that validates against the declared outputSchema.",
+        "Fix the outputSchema so it validates under JSON Schema draft 2020-12.",
     ),
     "TOOL-07": (
         "declared input constraints are enforced",
         SHOULD,
         "Validate tool arguments against the declared inputSchema; inputs that "
         "violate it must be rejected, not answered normally.",
+    ),
+    "TOOL-08": (
+        "observed structuredContent matches the declared outputSchema",
+        MUST,
+        "Ship a structuredContent that validates against the declared outputSchema.",
     ),
     "RES-01": (
         "advertised resources capability serves resources/list",
@@ -209,14 +215,19 @@ _CHECKS: dict[str, tuple[str, str, str]] = {
         MUST,
         "Validate prompt arguments and return an error when required ones are missing.",
     ),
+    "PROMPT-04": (
+        "prompts/list pagination terminates (no cursor loop)",
+        MUST,
+        "Return a nextCursor that advances and eventually ends; a repeating cursor hangs clients.",
+    ),
 }
 
 _SHARED_IDS = (
     "RPC-01", "RPC-02", "RPC-03",
-    "TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05", "TOOL-06", "TOOL-07",
+    "TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05", "TOOL-06", "TOOL-07", "TOOL-08",
     "LIST-01", "HYG-01", "CAP-01",
     "RES-01", "RES-02", "RES-03", "RES-04",
-    "PROMPT-01", "PROMPT-02", "PROMPT-03",
+    "PROMPT-01", "PROMPT-02", "PROMPT-03", "PROMPT-04",
     "CAP-02", "CAP-03",
 )
 _LEGACY_IDS = ("LIFE-01", "LIFE-02", "LIFE-03", *_SHARED_IDS)
@@ -390,11 +401,16 @@ async def _run_legacy_checks(probe) -> tuple[list[CheckResult], dict, list]:
 
     tools_resp = await _safe(probe.request("tools/list"))
     tools_served = tools_resp is not None and "result" in tools_resp
-    tools: list[dict] = []
+    tools: list = []
+    listing: PaginatedResult | None = None
     if tools_served:
-        raw = tools_resp["result"].get("tools")
-        tools = raw if isinstance(raw, list) else []
-        results.append(_res("LIFE-03", PASS, f"tools/list returned {len(tools)} tool(s) after initialized"))
+        listing = await _collect_listing(probe, "tools/list", "tools", tools_resp)
+        tools = listing.items
+        results.append(_res(
+            "LIFE-03", PASS,
+            f"tools/list returned {len(tools)} tool(s) across "
+            f"{listing.pages} page(s) after initialized",
+        ))
     elif not tools_declared:
         # a resources- or prompts-only server is spec-legal: nothing to demand here
         results.append(_res(
@@ -407,7 +423,7 @@ async def _run_legacy_checks(probe) -> tuple[list[CheckResult], dict, list]:
     else:
         results.append(_res("LIFE-03", FAIL, f"tools/list returned error: {tools_resp.get('error')}"))
 
-    results.append(await _pagination_check(probe, tools_resp, tools_declared, tools_served))
+    results.append(_pagination_result("LIST-01", listing, tools_declared, tools_served, "tools/list"))
     results.extend(await _rpc_checks(probe))
     results.extend(await _tool_checks(
         probe, tools, tools_served,
@@ -440,12 +456,13 @@ async def _run_modern_checks(probe, info: EraInfo) -> list[CheckResult]:
 
     tools_resp = await _safe(probe.request("tools/list"))
     tools_served = tools_resp is not None and "result" in tools_resp
-    tools: list[dict] = []
+    tools: list = []
+    listing: PaginatedResult | None = None
     if tools_served:
-        raw = tools_resp["result"].get("tools")
-        tools = raw if isinstance(raw, list) else []
+        listing = await _collect_listing(probe, "tools/list", "tools", tools_resp)
+        tools = listing.items
 
-    results.append(await _pagination_check(probe, tools_resp, tools_declared, tools_served))
+    results.append(_pagination_result("LIST-01", listing, tools_declared, tools_served, "tools/list"))
     results.extend(await _rpc_checks(probe))
 
     # negative probe: strip the envelope for one request (rung 1 of the ladder)
@@ -497,19 +514,19 @@ async def _run_modern_checks(probe, info: EraInfo) -> list[CheckResult]:
         skip_reason="tools/list failed" if tools_declared else "no tools surface to check",
     ))
 
-    # deterministic order (SHOULD, 2026-07-28 minor change 3)
-    if not tools_served:
-        results.append(_res("ORD-01", SKIP, "tools/list unavailable"))
+    # deterministic order (SHOULD, 2026-07-28 minor change 3) — compared over
+    # the full walk, so multi-page listings are judged on every page
+    if not tools_served or listing is None or not listing.complete:
+        results.append(_res("ORD-01", SKIP, "tools/list unavailable or its pagination is broken"))
     else:
-        again = await _safe(probe.request("tools/list"))
+        again = await collect_paginated(_page_fetch(probe, "tools/list"), "tools")
         first = [t.get("name") for t in tools if isinstance(t, dict)]
-        if again is None or "result" not in again:
-            results.append(_res("ORD-01", SKIP, "second tools/list call failed"))
+        if not again.complete:
+            results.append(_res("ORD-01", SKIP, f"second tools/list walk failed: {again.error}"))
         else:
-            raw = again["result"].get("tools")
-            second = [t.get("name") for t in raw if isinstance(t, dict)] if isinstance(raw, list) else []
+            second = [t.get("name") for t in again.items if isinstance(t, dict)]
             if first == second:
-                results.append(_res("ORD-01", PASS, f"two calls returned {len(first)} tool(s) in identical order"))
+                results.append(_res("ORD-01", PASS, f"two full walks returned {len(first)} tool(s) in identical order"))
             else:
                 results.append(_res("ORD-01", WARN, f"tool order differs between calls: {first} vs {second}"))
 
@@ -600,36 +617,37 @@ async def _header_check(probe) -> CheckResult:
 # --------------------------------------------------------------------------
 
 
-async def _pagination_check(
-    probe, first_resp, declared: bool, served: bool,
-    *, check_id: str = "LIST-01", method: str = "tools/list",
+def _page_fetch(probe, method: str):
+    """A collect_paginated fetch over a probe: page failures become None."""
+    async def fetch(cursor):
+        resp = await _safe(probe.request(method, {"cursor": cursor} if cursor else None))
+        result = resp.get("result") if isinstance(resp, dict) else None
+        return result if isinstance(result, dict) else None
+    return fetch
+
+
+async def _collect_listing(probe, method: str, key: str, first_resp) -> PaginatedResult:
+    """Every page of a list surface the checks will audit — the items the
+    security lane and the TOOL-*/RES-*/PROMPT-* checks see are exactly the
+    items the pagination walk saw, so a violation on page 2 cannot hide."""
+    first = first_resp["result"] if isinstance(first_resp.get("result"), dict) else {}
+    return await collect_paginated(_page_fetch(probe, method), key, first_page=first)
+
+
+def _pagination_result(
+    check_id: str, listing: PaginatedResult | None, declared: bool, served: bool,
+    method: str,
 ) -> CheckResult:
-    if not served:
+    if not served or listing is None:
         return _res(
             check_id, SKIP,
             f"{method} unavailable" if declared else "no surface to paginate",
         )
-    cursor = first_resp["result"].get("nextCursor")
-    if not cursor:
+    if not listing.complete:
+        return _res(check_id, FAIL, listing.error or "pagination did not terminate")
+    if listing.pages == 1:
         return _res(check_id, PASS, "single page, no pagination cursor")
-    seen = {cursor}
-    pages = 1
-    while cursor:
-        page = await _safe(probe.request(method, {"cursor": cursor}))
-        if page is None or "result" not in page:
-            return _res(check_id, FAIL, f"pagination broke at page {pages + 1}")
-        pages += 1
-        cursor = page["result"].get("nextCursor")
-        if cursor in seen:
-            return _res(
-                check_id, FAIL,
-                f"cursor repeats after {pages} pages — clients following it loop forever",
-            )
-        if cursor:
-            seen.add(cursor)
-        if pages > 20:
-            return _res(check_id, FAIL, "more than 20 pages — suspected unbounded pagination")
-    return _res(check_id, PASS, f"pagination terminates after {pages} page(s)")
+    return _res(check_id, PASS, f"pagination terminates after {listing.pages} page(s)")
 
 
 async def _rpc_checks(probe) -> list[CheckResult]:
@@ -692,9 +710,10 @@ async def _surface_checks(probe, caps: dict) -> list[CheckResult]:
     resp = await _safe(probe.request("resources/list"))
     served = resp is not None and "result" in resp
     resources: list[dict] = []
+    res_listing: PaginatedResult | None = None
     if served:
-        raw = resp["result"].get("resources")
-        resources = [r for r in raw if isinstance(r, dict)] if isinstance(raw, list) else []
+        res_listing = await _collect_listing(probe, "resources/list", "resources", resp)
+        resources = [r for r in res_listing.items if isinstance(r, dict)]
 
     if declared and served:
         results.append(_res("RES-01", PASS, f"resources/list returned {len(resources)} resource(s)"))
@@ -741,18 +760,17 @@ async def _surface_checks(probe, caps: dict) -> list[CheckResult]:
         else:
             results.append(_res("RES-03", PASS, f"read {uri}: {len(contents)} content entr(y/ies), uri echoed"))
 
-    results.append(await _pagination_check(
-        probe, resp, declared, served, check_id="RES-04", method="resources/list",
-    ))
+    results.append(_pagination_result("RES-04", res_listing, declared, served, "resources/list"))
 
     # ---- prompts ----
     p_declared = isinstance(caps, dict) and "prompts" in caps
     p_resp = await _safe(probe.request("prompts/list"))
     p_served = p_resp is not None and "result" in p_resp
     prompts: list[dict] = []
+    p_listing: PaginatedResult | None = None
     if p_served:
-        raw = p_resp["result"].get("prompts")
-        prompts = [p for p in raw if isinstance(p, dict)] if isinstance(raw, list) else []
+        p_listing = await _collect_listing(probe, "prompts/list", "prompts", p_resp)
+        prompts = [p for p in p_listing.items if isinstance(p, dict)]
 
     if p_declared and p_served:
         results.append(_res("PROMPT-01", PASS, f"prompts/list returned {len(prompts)} prompt(s)"))
@@ -807,6 +825,7 @@ async def _surface_checks(probe, caps: dict) -> list[CheckResult]:
                 f"prompts/get {name} missing its required argument returned a normal result",
             ))
 
+    results.append(_pagination_result("PROMPT-04", p_listing, p_declared, p_served, "prompts/list"))
     results.append(_cap_check("CAP-02", "resources", declared, served, len(resources)))
     results.append(_cap_check("CAP-03", "prompts", p_declared, p_served, len(prompts)))
     return results
@@ -819,7 +838,7 @@ async def _tool_checks(
         return [
             _res(cid, SKIP, skip_reason)
             for cid in ("TOOL-01", "TOOL-02", "TOOL-03", "TOOL-04", "TOOL-05",
-                        "TOOL-06", "TOOL-07")
+                        "TOOL-06", "TOOL-07", "TOOL-08")
         ]
 
     results: list[CheckResult] = []
@@ -909,7 +928,8 @@ async def _tool_checks(
                 f"{name} called with empty args returned a normal result (silent success)",
             ))
 
-    results.append(await _output_schema_check(probe, tools))
+    results.append(_output_schema_static_check(tools))
+    results.append(await _output_schema_dynamic_check(probe, tools))
     results.append(await _schema_enforcement_check(probe, tools))
 
     return results
@@ -917,7 +937,10 @@ async def _tool_checks(
 
 async def _schema_enforcement_check(probe, tools: list) -> CheckResult:
     """TOOL-07: send verified schema-violating inputs to side-effect-safe
-    tools; a normal answer means the declared constraints are decoration."""
+    tools; a normal answer means the declared constraints are decoration.
+    A missing answer is NOT rejection — a server that hangs or dies on
+    invalid input is its own finding, kept separate from enforcement
+    evidence (TOOL-04/05 apply the same discipline)."""
     from ..regression.negative import negative_variants
     from ..regression.recorder import classify_tool
 
@@ -928,16 +951,19 @@ async def _schema_enforcement_check(probe, tools: list) -> CheckResult:
     ][:3]
     attempted = 0
     offenders: list[str] = []
+    unresponsive: list[str] = []
     for t in candidates:
         for case, args in negative_variants(t["inputSchema"], limit=2):
             attempted += 1
             resp = await _safe(probe.request(
                 "tools/call", {"name": t["name"], "arguments": args}
             ))
-            result_obj = resp.get("result") if isinstance(resp, dict) else None
+            if resp is None:
+                unresponsive.append(f"{t['name']} ({case})")
+                continue
+            result_obj = resp.get("result")
             rejected = (
-                resp is None
-                or "error" in resp
+                "error" in resp
                 or (isinstance(result_obj, dict) and result_obj.get("isError"))
             )
             if not rejected:
@@ -945,29 +971,35 @@ async def _schema_enforcement_check(probe, tools: list) -> CheckResult:
                     f"{t['name']}: minimal invalid input ({case}) was answered normally"
                 )
     if not attempted:
-        return _res("TOOL-07", SKIP, "no safe tool offers a verifiable schema-violating variant")
-    if offenders:
         return _res(
-            "TOOL-07", WARN,
-            "declared constraints not enforced — " + "; ".join(offenders[:4]),
+            "TOOL-07", SKIP,
+            "no safe tool offers a verified schema-violating variant "
+            "(a schema-valid baseline with exactly one field mutated)",
         )
+    problems: list[str] = []
+    if offenders:
+        problems.append("declared constraints not enforced — " + "; ".join(offenders[:4]))
+    if unresponsive:
+        problems.append(
+            "no response to invalid input (timeout or transport failure — "
+            "hanging on bad input is not rejection): " + ", ".join(unresponsive[:4])
+        )
+    if problems:
+        return _res("TOOL-07", WARN, "; ".join(problems))
     return _res(
         "TOOL-07", PASS,
         f"{attempted} schema-violating input(s) across {len(candidates)} tool(s), all rejected",
     )
 
 
-async def _output_schema_check(probe, tools: list) -> CheckResult:
-    from ..regression.recorder import classify_tool
-    from ..regression.sampler import sample_args
-
+def _output_schema_static_check(tools: list) -> CheckResult:
+    """TOOL-06: the static half — every declared outputSchema compiles."""
     declaring = [
         t for t in tools
         if isinstance(t, dict) and t.get("name") and isinstance(t.get("outputSchema"), dict)
     ]
     if not declaring:
         return _res("TOOL-06", SKIP, "no tool declares an outputSchema")
-
     bad = []
     for t in declaring:
         try:
@@ -976,38 +1008,76 @@ async def _output_schema_check(probe, tools: list) -> CheckResult:
             bad.append(f"{t['name']}: {exc.message}")
     if bad:
         return _res("TOOL-06", FAIL, "outputSchema does not compile: " + "; ".join(bad))
+    return _res("TOOL-06", PASS, f"all {len(declaring)} declared outputSchema(s) compile")
 
-    # dynamic half: call one side-effect-safe declaring tool for real
-    # (annotations outrank the name heuristic — see classify_tool)
-    candidate = next(
-        (
-            t for t in declaring
-            if classify_tool(t["name"], t.get("description"), t.get("annotations"))[0] == "auto"
-        ),
-        None,
+
+async def _output_schema_dynamic_check(probe, tools: list) -> CheckResult:
+    """TOOL-08: the dynamic half — observed structuredContent validates.
+
+    Split from TOOL-06 so unobserved never masquerades as verified: when no
+    declaring tool can be safely called with schema-valid arguments, the
+    verdict is SKIP with the reason, not a PASS that quietly means
+    "unverified". Annotations outrank the name heuristic (classify_tool).
+    """
+    from ..regression.recorder import classify_tool
+    from ..regression.sampler import synthesize_valid_args
+
+    declaring = [
+        t for t in tools
+        if isinstance(t, dict) and t.get("name") and isinstance(t.get("outputSchema"), dict)
+    ]
+    if not declaring:
+        return _res("TOOL-08", SKIP, "no tool declares an outputSchema")
+
+    compiling = []
+    for t in declaring:
+        try:
+            Draft202012Validator.check_schema(t["outputSchema"])
+            compiling.append(t)
+        except SchemaError:
+            continue  # TOOL-06's finding; nothing sound to validate against here
+    if not compiling:
+        return _res("TOOL-08", SKIP, "no declared outputSchema compiles (see TOOL-06)")
+
+    candidates = [
+        t for t in compiling
+        if classify_tool(t["name"], t.get("description"), t.get("annotations"))[0] == "auto"
+    ][:3]
+    if not candidates:
+        return _res(
+            "TOOL-08", SKIP,
+            "declaring tools look destructive — runtime behaviour unobserved",
+        )
+
+    unobserved: list[str] = []
+    for candidate in candidates:
+        name = candidate["name"]
+        args, reason = synthesize_valid_args(candidate.get("inputSchema") or {})
+        if args is None:
+            unobserved.append(f"{name}: {reason}")
+            continue
+        resp = await _safe(probe.request(
+            "tools/call", {"name": name, "arguments": args},
+        ))
+        result_obj = resp.get("result") if isinstance(resp, dict) else None
+        if not isinstance(result_obj, dict) or result_obj.get("isError"):
+            unobserved.append(f"{name}: call yielded no normal result")
+            continue
+        structured = result_obj.get("structuredContent")
+        if structured is None:
+            return _res(
+                "TOOL-08", WARN,
+                f"{name} declares an outputSchema but returned no structuredContent",
+            )
+        try:
+            jsonschema_validate(instance=structured, schema=candidate["outputSchema"])
+        except ValidationError as exc:
+            return _res(
+                "TOOL-08", FAIL,
+                f"{name} structuredContent violates its outputSchema: {exc.message}",
+            )
+        return _res("TOOL-08", PASS, f"{name} structuredContent validates against its outputSchema")
+    return _res(
+        "TOOL-08", SKIP,
+        "runtime behaviour unobserved — " + "; ".join(unobserved[:3]),
     )
-    compiled = f"all {len(declaring)} outputSchema(s) compile"
-    if candidate is None:
-        return _res(
-            "TOOL-06", PASS,
-            f"{compiled}; dynamic validation skipped (declaring tools look destructive)",
-        )
-    name = candidate["name"]
-    resp = await _safe(probe.request(
-        "tools/call",
-        {"name": name, "arguments": sample_args(candidate.get("inputSchema") or {})},
-    ))
-    result_obj = resp.get("result") if isinstance(resp, dict) else None
-    if not isinstance(result_obj, dict) or result_obj.get("isError"):
-        return _res(
-            "TOOL-06", PASS,
-            f"{compiled}; dynamic call to {name} did not yield a normal result, structured output unverified",
-        )
-    structured = result_obj.get("structuredContent")
-    if structured is None:
-        return _res("TOOL-06", WARN, f"{name} declares an outputSchema but returned no structuredContent")
-    try:
-        jsonschema_validate(instance=structured, schema=candidate["outputSchema"])
-    except ValidationError as exc:
-        return _res("TOOL-06", FAIL, f"{name} structuredContent violates its outputSchema: {exc.message}")
-    return _res("TOOL-06", PASS, f"{name} structuredContent validates against its outputSchema")

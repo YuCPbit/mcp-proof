@@ -56,12 +56,16 @@ async def _regression_lane(args, cmd: list[str] | None, url: str | None, era: st
     if not manifest.exists():
         print(f"→ regression lane: no baseline at {fdir}, recording one")
         skipped: list[str] = []
+        unsynthesizable: list[str] = []
         await record(cmd, fdir, include_destructive=args.include_destructive,
                      skipped_out=skipped, edge_cases=getattr(args, "edge_cases", False),
-                     url=url, era=era)
+                     url=url, era=era, synthesis_skipped_out=unsynthesizable)
         if skipped:
             print(f"  ⚠ skipped {len(skipped)} potentially destructive tool(s): "
                   f"{', '.join(skipped)} (--include-destructive to record them)")
+        if unsynthesizable:
+            print(f"  ⚠ skipped {len(unsynthesizable)} tool(s) with no schema-valid "
+                  f"synthesizable arguments: {'; '.join(unsynthesizable)}")
     print("→ regression lane: replaying fixtures")
     drifts = await replay(cmd, fdir, url=url, era=era)
     fixtures_sha = ""
@@ -225,14 +229,19 @@ async def _cmd_record(args) -> int:
     from .regression.recorder import record
 
     skipped: list[str] = []
+    unsynthesizable: list[str] = []
     paths = await record(args.server_cmd or None, Path(args.fixtures),
                          include_destructive=args.include_destructive, skipped_out=skipped,
                          edge_cases=getattr(args, "edge_cases", False),
-                         url=getattr(args, "url", None), era=getattr(args, "era", "auto"))
+                         url=getattr(args, "url", None), era=getattr(args, "era", "auto"),
+                         synthesis_skipped_out=unsynthesizable)
     print(f"✓ recorded {len(paths)} fixtures into {args.fixtures}")
     if skipped:
         print(f"⚠ skipped {len(skipped)} potentially destructive tool(s): "
               f"{', '.join(skipped)} (--include-destructive to record them)")
+    if unsynthesizable:
+        print(f"⚠ skipped {len(unsynthesizable)} tool(s) with no schema-valid "
+              f"synthesizable arguments: {'; '.join(unsynthesizable)}")
     return 0
 
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>modern-era demo (2026-07-28) — MCP Delivery Report</title>
+<title>modern-target — MCP Delivery Report</title>
 <style>
   :root {
     color-scheme: light;
@@ -123,7 +123,7 @@
   </nav>
 
   <div class="brand"><span class="mark">mcp-proof</span><span class="doc">Delivery report</span></div>
-  <h1>modern-era demo (2026-07-28)</h1>
+  <h1>modern-target</h1>
 
   
   <div class="verdict pass">✓ SHIP-READY <span class="why">— all MUST checks pass, no security findings, no behavioural drift</span></div>
@@ -131,16 +131,16 @@
 
   <dl class="meta">
     <dt>Server under test</dt><dd class="mono">.venv/bin/python tests/modern_target_server.py</dd>
-    <dt>Generated</dt><dd>2026-08-20 22:42 UTC · mcp-proof v0.6.0</dd>
+    <dt>Generated</dt><dd>2026-08-21 16:32 UTC · mcp-proof v0.7.0</dd>
     <dt>Protocol</dt><dd>selected <span class="mono">2026-07-28</span> · modern era (server/discover)
       </dd>
-    <dt>Run fingerprint</dt><dd class="mono">sha256:db65617122fc4723b3e602bf75e4e00ee72f76054c0b2234738cbb8627482e49</dd>
+    <dt>Behaviour fingerprint</dt><dd class="mono">sha256:f3f65b7c4ba8bfd11470d004e568d43f18f2001e4959704982b8c3cb735fd950</dd>
   </dl>
 
   <div class="tiles">
     <div class="tile" style="--tile-accent: var(--good)">
       <div class="k">Conformance</div>
-      <div class="v">21/21</div>
+      <div class="v">23/23</div>
       <div class="s">MUST checks passed · 8/8 SHOULD</div>
     </div>
     <div class="tile" style="--tile-accent: var(--good)">
@@ -312,7 +312,18 @@
         <td class="level">MUST</td>
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
-          <div class="title">declared outputSchemas compile and structured results match them</div>
+          <div class="title">declared outputSchemas compile as JSON Schema</div>
+          <div class="evidence">all 1 declared outputSchema(s) compile</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="TOOL-08" data-status="PASS">
+        <td class="id">TOOL-08</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">observed structuredContent matches the declared outputSchema</div>
           <div class="evidence">price structuredContent validates against its outputSchema</div>
           
         </td>
@@ -335,7 +346,7 @@
         <td><span class="badge pass">✓ PASS</span></td>
         <td>
           <div class="title">tools/list returns tools in a deterministic order</div>
-          <div class="evidence">two calls returned 2 tool(s) in identical order</div>
+          <div class="evidence">two full walks returned 2 tool(s) in identical order</div>
           
         </td>
       </tr>
@@ -413,6 +424,17 @@
         <td>
           <div class="title">prompts/get rejects a call missing required arguments</div>
           <div class="evidence">summarize with empty args rejected (code -32602)</div>
+          
+        </td>
+      </tr>
+    
+      <tr id="PROMPT-04" data-status="PASS">
+        <td class="id">PROMPT-04</td>
+        <td class="level">MUST</td>
+        <td><span class="badge pass">✓ PASS</span></td>
+        <td>
+          <div class="title">prompts/list pagination terminates (no cursor loop)</div>
+          <div class="evidence">single page, no pagination cursor</div>
           
         </td>
       </tr>
@@ -572,9 +594,10 @@
   </table>
 
   <h2 id="msss">MSSS compliance</h2>
-  <p class="msss-lead"><b>L1: 2/2 auto-assessable controls met · 4 require manual review.</b>
+  <p class="msss-lead"><b>L1: 1/2 auto-assessable controls met · 1 partial · 4 require manual review.</b>
      Mapped against MSSS v0.1 (control-level mapping v2.0 (2026-01-20)): 3 of
-     24 controls are auto-assessable from this audit's deterministic checks; the remaining
+     24 controls are auto-assessable from this audit's deterministic checks
+     (partial = evidence ran clean but cannot prove the control on its own); the remaining
      21 need deployment, code or process evidence and are marked manual review — never assessed
      by this tool.
      <button class="msss-toggle" data-show="Show all 24 controls" data-hide="Collapse">Show all 24 controls</button></p>
@@ -653,17 +676,17 @@
         </td>
       </tr>
     
-      <tr id="MCP-LOG-02" data-status="PASS">
+      <tr id="MCP-LOG-02" data-status="WARN">
         <td class="id">MCP-LOG-02</td>
         <td class="level">Logging</td>
         <td class="level">L1</td>
-        <td><span class="badge pass">✓ met</span>
+        <td><span class="badge warn">◐ partial</span>
         </td>
         <td>
           <div class="title">Secret Redaction in Logs</div>
           <div class="fix"><b>Evidence checks:</b> SEC-03</div>
           
-          <div class="fix">Auto-assessed over advertised tool metadata; server log output is not inspected.</div>
+          <div class="fix">Supporting evidence only: SEC-03 scans advertised tool metadata for secret-like strings; server log output is not inspected, so a clean scan cannot prove log redaction (a leak still proves a gap).</div>
         </td>
       </tr>
     
@@ -931,14 +954,14 @@
     <tbody>
     
       <tr data-status="PASS">
-        <td class="id">echo__88dfa77a.json</td>
+        <td class="id">0001__echo__88dfa77a.json</td>
         <td>echo</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
       </tr>
     
       <tr data-status="PASS">
-        <td class="id">price__9b815a00.json</td>
+        <td class="id">0002__price__9b815a00.json</td>
         <td>price</td>
         <td><span class="badge ok">OK</span></td>
         <td><div class="evidence"></div></td>
@@ -950,7 +973,7 @@
   <div class="leave">
     <h2>Leave-behind: your regression gate</h2>
     <p>The recorded fixtures (<span style="font-family:var(--mono)">demo/fixtures-modern</span>,
-       suite fingerprint <span style="font-family:var(--mono)">sha256:2a58e631a0d2f8d5cb29b5cd8282cc2c712307158d2a5a5603a711b4f4534166</span>)
+       suite fingerprint <span style="font-family:var(--mono)">sha256:148a7604db8d311f8810750bd1d69cae6581dcaaf57a9c08d02632c50ad13c09</span>)
        are the behavioural contract of this server. Keep them in the repository and run the workflow below in CI —
        any breaking or value drift fails the build before it reaches your users.</p>
     <pre># The recorded fixtures in demo/fixtures-modern are the behavioral contract: any drift fails this job.
@@ -984,11 +1007,12 @@ jobs:
   </ol>
 
   <footer>
-    Reproducible audit — the fingerprint covers every check outcome and behavioural replay verdict
-    (never timestamps or latency measurements).
+    Reproducible audit — the behaviour fingerprint covers every check verdict and behavioural
+    replay verdict (never timestamps, latency measurements, the launch command or the auditor's
+    version — those live in the JSON model's separate <span class="mono">run_hash</span>).
     Re-run with identical server behaviour and the hash matches:
-    <span class="mono">sha256:db65617122fc4723b3e602bf75e4e00ee72f76054c0b2234738cbb8627482e49</span><br>
-    Generated by mcp-proof v0.6.0 · deterministic lanes only, no LLM judging ·
+    <span class="mono">sha256:f3f65b7c4ba8bfd11470d004e568d43f18f2001e4959704982b8c3cb735fd950</span><br>
+    Generated by mcp-proof v0.7.0 · deterministic lanes only, no LLM judging ·
     MCP spec reference 2026-07-28 (modern era (server/discover))
   </footer>
 

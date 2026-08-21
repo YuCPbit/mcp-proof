@@ -1,10 +1,20 @@
 """The versioned, machine-readable report model.
 
 Single source of truth for every output format: the HTML template, the JSON
-artifact, JUnit and SARIF are all rendered from this dict. ``run_hash``
-covers inputs and behavioural outcomes — never timestamps, never latency
-measurements — so identical behaviour reproduces the identical fingerprint;
-volatile context lives under ``observation``.
+artifact, JUnit and SARIF are all rendered from this dict.
+
+Two fingerprints, two questions (schema v2):
+
+* ``behavior_sha256`` — *what did the server do?* Check verdicts
+  (id/level/status), non-latency drift verdicts, protocol facts. Evidence
+  strings stay out (failure evidence embeds stderr tails and other
+  environment noise), as do the auditor's version and the launch command —
+  identical server behaviour fingerprints identically across machines.
+* ``run_hash`` — *what did this audit run consist of?* Everything above plus
+  the mcp-proof version, the server command and the full evidence text.
+
+Neither ever includes timestamps or latency measurements; volatile context
+lives under ``observation``.
 """
 
 from dataclasses import asdict, is_dataclass
@@ -15,7 +25,7 @@ from ..checks.base import FAIL, MUST, PASS, SHOULD, SKIP, WARN
 from ..checks.msss import evaluate_msss
 from ..provenance import obj_hash
 
-REPORT_SCHEMA_VERSION = 1
+REPORT_SCHEMA_VERSION = 2
 
 
 def _as_dicts(results: list) -> list[dict]:
@@ -105,7 +115,25 @@ def build_model(
         blockers.append(f"{drifting} behavioural drift(s)")
 
     # LATENCY rows carry live measurements and the summary is derived data —
-    # both stay out of the fingerprint so it depends on behaviour only.
+    # both stay out of every fingerprint.
+    reg_drifts = [d for d in (reg or {}).get("drifts", []) if d.get("kind") != "LATENCY"]
+    behavior_sha256 = obj_hash(
+        {
+            "negotiated_protocol": negotiated_protocol,
+            "protocol_era": protocol_era,
+            # verdicts only: evidence strings can embed stderr tails and other
+            # environment noise, so they belong to the audit hash, not this one
+            "conformance": [{"id": r["id"], "level": r["level"], "status": r["status"]}
+                            for r in conf],
+            "security": [{"id": r["id"], "level": r["level"], "status": r["status"]}
+                         for r in sec],
+            "regression": reg and {
+                "drifts": [{"fixture": d["fixture"], "tool": d["tool"],
+                            "kind": d["kind"], "detail": d["detail"]} for d in reg_drifts],
+                "fixtures_sha256": reg.get("fixtures_sha256"),
+            },
+        }
+    )
     run_hash = obj_hash(
         {
             "tool": {"name": "mcp-proof", "version": __version__},
@@ -115,7 +143,7 @@ def build_model(
             "conformance": conf,
             "security": sec,
             "regression": reg and {
-                "drifts": [d for d in reg.get("drifts", []) if d.get("kind") != "LATENCY"],
+                "drifts": reg_drifts,
                 "fixtures_sha256": reg.get("fixtures_sha256"),
             },
         }
@@ -140,6 +168,7 @@ def build_model(
     return {
         "report_schema_version": REPORT_SCHEMA_VERSION,
         "tool": {"name": "mcp-proof", "version": __version__},
+        "behavior_sha256": behavior_sha256,
         "run_hash": run_hash,
         "server": {
             "name": server_name,

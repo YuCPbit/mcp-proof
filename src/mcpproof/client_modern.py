@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 from . import LATEST_SPEC
 from .era import parse_discover_result
+from .pagination import collect_paginated
 
 
 class ModernSessionError(RuntimeError):
@@ -31,41 +32,35 @@ def _shim_tool(t: dict) -> SimpleNamespace:
     )
 
 
-def _shim_part(p: dict) -> SimpleNamespace:
-    return SimpleNamespace(type=p.get("type", "unknown"), text=p.get("text", ""))
-
-
 class ModernProbeSession:
     """tools/list and tools/call over a modern-era probe, SDK-shaped results.
 
     Mirrors the 1.x ``ClientSession`` contract the regression lane relies on:
     JSON-RPC protocol errors raise, tool-level failures (``isError: true``)
-    return as results.
+    return as results. Content parts stay raw wire dicts — the recorder's
+    normalizer owns what to keep, so nothing is lost in the shim.
     """
 
     def __init__(self, probe):
         self._probe = probe
 
     async def list_tools(self) -> SimpleNamespace:
-        tools: list[SimpleNamespace] = []
-        cursor: str | None = None
-        pages = 0
-        while True:
+        async def fetch(cursor):
             resp = await self._probe.request(
                 "tools/list", {"cursor": cursor} if cursor else {}
             )
-            if resp is None or "result" not in resp:
+            if resp is None or not isinstance(resp.get("result"), dict):
                 raise ModernSessionError(
                     f"tools/list failed: {(resp or {}).get('error', 'no response')}"
                 )
-            page = resp["result"]
-            raw = page.get("tools")
-            if isinstance(raw, list):
-                tools += [_shim_tool(t) for t in raw if isinstance(t, dict)]
-            cursor = page.get("nextCursor")
-            pages += 1
-            if not cursor or pages > 50:
-                return SimpleNamespace(tools=tools)
+            return resp["result"]
+
+        collected = await collect_paginated(fetch, "tools")
+        if not collected.complete:  # fail closed: a partial listing is not the surface
+            raise ModernSessionError(f"tools/list pagination incomplete: {collected.error}")
+        return SimpleNamespace(
+            tools=[_shim_tool(t) for t in collected.items if isinstance(t, dict)]
+        )
 
     async def call_tool(self, name: str, arguments: dict) -> SimpleNamespace:
         resp = await self._probe.request("tools/call", {"name": name, "arguments": arguments})
@@ -76,8 +71,7 @@ class ModernProbeSession:
         result = resp.get("result") if isinstance(resp.get("result"), dict) else {}
         parts = result.get("content")
         return SimpleNamespace(
-            content=[_shim_part(p) for p in parts if isinstance(p, dict)]
-            if isinstance(parts, list) else [],
+            content=[p for p in parts if isinstance(p, dict)] if isinstance(parts, list) else [],
             structuredContent=result.get("structuredContent"),
             isError=bool(result.get("isError")),
         )

@@ -1,19 +1,31 @@
 """Replay recorded fixtures against a live server and classify drift.
 
-Verdict ladder per fixture: ERROR (tool gone / call raised) beats
-BREAKING (shape changed) beats VALUE (a number, date, or negation flipped)
-beats COSMETIC (text differs, meaning-neutral) beats OK. Latency blowups
-are appended as extra LATENCY rows and never mask a content verdict.
+Before anything is replayed, ``verify_fixture_set`` proves the fixture set
+is the one that was recorded: manifest present and readable, every listed
+fixture on disk, no duplicates or stale extras, every contract hash
+recomputed and matching, the aggregate fingerprint intact. Any integrity
+failure is an ERROR row — the gate fails closed instead of silently
+replaying whatever happens to be on disk.
+
+Verdict ladder per fixture: ERROR (integrity / tool gone / call raised)
+beats BREAKING (shape changed) beats VALUE (any observed value changed —
+numbers, dates, negations, structured fields, non-text payloads, JSON text
+values) beats COSMETIC (free-text differs, no value signal) beats OK.
+Latency blowups are appended as extra LATENCY rows and never mask a
+content verdict.
 """
 
 import difflib
 import json
 import re
 import time
+from collections import Counter
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from .recorder import normalize_response
+from ..provenance import obj_hash
+from .recorder import MANIFEST_NAME, SCHEMA_VERSION, normalize_response
 
 NEGATION_TOKENS = ("not", "no", "never", "cannot", "can't", "won't", "isn't", "refused")
 
@@ -31,18 +43,119 @@ class DriftResult:
     detail: str
 
 
-def _replay_order(fixtures_dir: Path) -> list[Path]:
-    """Manifest order == recording order; stateful call sequences depend on it."""
-    on_disk = {p.name: p for p in fixtures_dir.glob("*.json") if not p.name.startswith("_")}
-    manifest_path = fixtures_dir / "_manifest.json"
-    if manifest_path.exists():
+def _contract_of(fixture: dict) -> dict:
+    return {"tool": fixture["tool"], "args": fixture["args"], "response": fixture["response"]}
+
+
+def verify_fixture_set(fixtures_dir: Path) -> tuple[list[Path], list[DriftResult]]:
+    """Fail-closed integrity gate over a fixture set.
+
+    Returns ``(paths to replay, integrity problems)``. Paths come back in
+    manifest order (recording order — stateful sequences depend on it) and
+    exclude anything that failed verification: a missing manifest, a listed
+    fixture missing from disk, a fixture whose recomputed contract hash
+    disagrees with its stored one, a manifest fingerprint that no longer
+    matches the recorded contracts, duplicates, and stale extras all become
+    ERROR rows that fail the gate.
+
+    Compatibility: fixtures older than v3 predate ``contract_sha256`` — their
+    content cannot be hash-verified, so per-fixture and aggregate checks are
+    skipped for them (they still replay). v3 manifests aggregated sorted
+    hashes; v4 aggregates in recording order.
+    """
+    problems: list[DriftResult] = []
+    on_disk = {
+        p.name: p for p in sorted(fixtures_dir.glob("*.json")) if not p.name.startswith("_")
+    }
+    manifest_path = fixtures_dir / MANIFEST_NAME
+    if not manifest_path.exists():
+        problems.append(DriftResult(
+            MANIFEST_NAME, "?", "ERROR",
+            "manifest missing — fixture-set integrity and stateful replay order "
+            "cannot be verified",
+        ))
+        return list(on_disk.values()), problems
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        listed = manifest["fixtures"]
+        if not isinstance(listed, list):
+            raise TypeError("manifest 'fixtures' is not a list")
+    except Exception as exc:
+        problems.append(DriftResult(
+            MANIFEST_NAME, "?", "ERROR", f"manifest unreadable: {exc}",
+        ))
+        return list(on_disk.values()), problems
+
+    manifest_version = manifest.get("schema_version")
+    if isinstance(manifest_version, int) and manifest_version > SCHEMA_VERSION:
+        problems.append(DriftResult(
+            MANIFEST_NAME, "?", "ERROR",
+            f"manifest schema_version {manifest_version} is newer than this mcp-proof "
+            f"understands (≤{SCHEMA_VERSION}) — refusing to guess its semantics",
+        ))
+        return [], problems
+
+    for name in sorted(n for n, c in Counter(listed).items() if c > 1):
+        problems.append(DriftResult(
+            name, "?", "ERROR", "manifest lists this fixture more than once",
+        ))
+    duplicates = len(listed) != len(set(listed))
+
+    ordered: list[Path] = []
+    recomputed: list[str] = []
+    hashes_verifiable = True
+    seen: set[str] = set()
+    for name in listed:
+        if not isinstance(name, str) or name in seen:
+            continue
+        seen.add(name)
+        path = on_disk.pop(name, None)
+        if path is None:
+            problems.append(DriftResult(
+                name, "?", "ERROR", "manifest lists this fixture but it is missing on disk",
+            ))
+            hashes_verifiable = False
+            continue
         try:
-            listed = json.loads(manifest_path.read_text(encoding="utf-8"))["fixtures"]
-            ordered = [on_disk.pop(name) for name in listed if name in on_disk]
-            return ordered + [on_disk[n] for n in sorted(on_disk)]
-        except Exception:
-            pass
-    return [on_disk[n] for n in sorted(on_disk)]
+            fixture = json.loads(path.read_text(encoding="utf-8"))
+            contract_hash = obj_hash(_contract_of(fixture))
+        except Exception as exc:
+            problems.append(DriftResult(name, "?", "ERROR", f"fixture unreadable: {exc}"))
+            hashes_verifiable = False
+            continue
+        stored = fixture.get("contract_sha256")
+        if stored is None:
+            # pre-v3 fixture: recorded before the hash discipline existed
+            hashes_verifiable = False
+        elif stored != contract_hash:
+            problems.append(DriftResult(
+                name, fixture.get("tool") or "?", "ERROR",
+                "contract_sha256 mismatch — fixture content was modified after "
+                "recording; a tampered baseline is not replayed as truth",
+            ))
+            hashes_verifiable = False
+            continue
+        ordered.append(path)
+        recomputed.append(contract_hash)
+
+    for name in sorted(on_disk):
+        problems.append(DriftResult(
+            name, "?", "ERROR",
+            "fixture on disk but not in the manifest — stale or foreign; not replayed "
+            "(it would run outside the recorded call order)",
+        ))
+
+    declared = manifest.get("fixtures_sha256")
+    if declared and hashes_verifiable and not duplicates:
+        ordered_manifest = isinstance(manifest_version, int) and manifest_version >= 4
+        expected = obj_hash(recomputed if ordered_manifest else sorted(recomputed))
+        if expected != declared:
+            problems.append(DriftResult(
+                MANIFEST_NAME, "?", "ERROR",
+                "manifest fixtures_sha256 does not match the recorded contracts — "
+                "the manifest was modified after recording",
+            ))
+    return ordered, problems
 
 
 async def replay(
@@ -52,10 +165,16 @@ async def replay(
     from .recorder import _session_ctx, list_all_tools
 
     fixtures_dir = Path(fixtures_dir)
-    paths = _replay_order(fixtures_dir)
-    results: list[DriftResult] = []
+    paths, results = verify_fixture_set(fixtures_dir)
     async with await _session_ctx(cmd, url, era) as session:
-        available = {t.name for t in await list_all_tools(session)}
+        try:
+            available = {t.name for t in await list_all_tools(session)}
+        except Exception as exc:
+            results.append(DriftResult(
+                "tools/list", "?", "ERROR",
+                f"could not enumerate live tools ({exc}) — replay aborted",
+            ))
+            return results
         for path in paths:
             try:
                 fixture = json.loads(path.read_text(encoding="utf-8"))
@@ -65,6 +184,8 @@ async def replay(
             except Exception as exc:
                 results.append(DriftResult(path.name, "?", "ERROR", f"fixture unreadable: {exc}"))
                 continue
+            version = fixture.get("schema_version")
+            version = version if isinstance(version, int) else 1
             if tool not in available:
                 results.append(DriftResult(path.name, tool, "ERROR", "tool no longer exists"))
                 continue
@@ -75,8 +196,10 @@ async def replay(
                 results.append(DriftResult(path.name, tool, "ERROR", f"call raised: {exc}"))
                 continue
             latency_ms = int((time.perf_counter() - start) * 1000)
-            results.append(_classify(path.name, tool, recorded, normalize_response(result)))
-            observation = fixture.get("observation") or {}  # v3; ≤v2 kept it top-level
+            results.append(
+                _classify(path.name, tool, recorded, normalize_response(result), version)
+            )
+            observation = fixture.get("observation") or {}  # v3+; ≤v2 kept it top-level
             recorded_ms = int(observation.get("latency_ms", fixture.get("latency_ms", 0)) or 0)
             threshold = max(3 * recorded_ms, recorded_ms + 500)
             if latency_ms > threshold:
@@ -104,7 +227,7 @@ def summarize(results: list[DriftResult]) -> dict:
     return counts
 
 
-def _classify(fixture: str, tool: str, old: dict, new: dict) -> DriftResult:
+def _classify(fixture: str, tool: str, old: dict, new: dict, version: int = SCHEMA_VERSION) -> DriftResult:
     if bool(old.get("is_error")) != bool(new.get("is_error")):
         return DriftResult(
             fixture,
@@ -120,6 +243,9 @@ def _classify(fixture: str, tool: str, old: dict, new: dict) -> DriftResult:
         return DriftResult(
             fixture, tool, "BREAKING", f"content parts changed: {old_types} → {new_types}"
         )
+    part = _part_drift(old_parts, new_parts, strict=version >= 4)
+    if part:
+        return DriftResult(fixture, tool, "VALUE", part)
     structured = _structured_drift(old, new)
     if structured:
         kind, detail = structured
@@ -129,6 +255,9 @@ def _classify(fixture: str, tool: str, old: dict, new: dict) -> DriftResult:
     structural = _json_structure_drift(old_text, new_text)
     if structural:
         return DriftResult(fixture, tool, "BREAKING", structural)
+    json_value = _json_value_drift(old_text, new_text)
+    if json_value:
+        return DriftResult(fixture, tool, "VALUE", json_value)
     value = _value_drift(old_text, new_text)
     if value:
         return DriftResult(fixture, tool, "VALUE", value)
@@ -139,6 +268,34 @@ def _classify(fixture: str, tool: str, old: dict, new: dict) -> DriftResult:
 
 def _concat_text(parts: list[dict]) -> str:
     return "\n".join(p.get("text", "") for p in parts if p.get("type") == "text")
+
+
+def _short(value) -> str:
+    try:
+        rendered = json.dumps(value, ensure_ascii=False, default=str)
+    except Exception:
+        rendered = repr(value)
+    return rendered if len(rendered) <= 80 else rendered[:77] + "…"
+
+
+def _part_drift(old_parts: list, new_parts: list, strict: bool) -> str | None:
+    """Non-text content payloads (image/audio digests, embedded resources)
+    compared field by field. ``strict`` for v4 fixtures which record every
+    field; older fixtures only recorded the type, so only shared fields can
+    be compared without inventing drift."""
+    for i, (o, n) in enumerate(zip(old_parts, new_parts, strict=False)):
+        if not isinstance(o, dict) or not isinstance(n, dict):
+            continue
+        if o.get("type") == "text":
+            continue  # text payloads take the text/JSON ladder below
+        keys = (set(o) | set(n)) if strict else (set(o) & set(n))
+        for key in sorted(keys):
+            if o.get(key) != n.get(key):
+                return (
+                    f"content[{i}] ({o.get('type')}): {key} changed: "
+                    f"{_short(o.get(key))} → {_short(n.get(key))}"
+                )
+    return None
 
 
 def _structured_drift(old: dict, new: dict) -> tuple[str, str] | None:
@@ -156,13 +313,17 @@ def _structured_drift(old: dict, new: dict) -> tuple[str, str] | None:
             f"structuredContent keys changed: added {sorted(new_keys - old_keys)}, "
             f"removed {sorted(old_keys - new_keys)}",
         )
+    # same shape, different content: structured fields are consumed by
+    # programs, so ANY value change is VALUE — never "cosmetic". The date/
+    # number/negation scan only enriches the detail message.
     from ..provenance import canonical_json
 
     old_json, new_json = canonical_json(o), canonical_json(n)
     value = _value_drift(old_json, new_json)
     if value:
         return "VALUE", "structuredContent: " + value
-    return "COSMETIC", "structuredContent differs: " + _diff_snippet(old_json, new_json)
+    path, desc = _first_leaf_diff(o, n)
+    return "VALUE", f"structuredContent value changed at {path}: {desc}"
 
 
 def _json_structure_drift(old_text: str, new_text: str) -> str | None:
@@ -179,6 +340,35 @@ def _json_structure_drift(old_text: str, new_text: str) -> str | None:
         removed = sorted(old_keys - new_keys)
         return f"JSON structure keys changed: added {added}, removed {removed}"
     return None
+
+
+def _json_value_drift(old_text: str, new_text: str) -> str | None:
+    """Text that parses as JSON is machine-consumed like structuredContent:
+    any value change is VALUE, whatever the strings say."""
+    old_doc = _try_json(old_text)
+    new_doc = _try_json(new_text)
+    if old_doc is None or new_doc is None or old_doc == new_doc:
+        return None
+    value = _value_drift(old_text, new_text)
+    if value:
+        return "JSON response: " + value
+    path, desc = _first_leaf_diff(old_doc, new_doc)
+    return f"JSON response value changed at {path}: {desc}"
+
+
+def _first_leaf_diff(old, new, path: str = "") -> tuple[str, str]:
+    if isinstance(old, dict) and isinstance(new, dict):
+        for key in sorted(set(old) | set(new)):
+            if old.get(key) != new.get(key):
+                child = f"{path}.{key}" if path else str(key)
+                return _first_leaf_diff(old.get(key), new.get(key), child)
+    elif isinstance(old, list) and isinstance(new, list):
+        for i, (a, b) in enumerate(zip(old, new, strict=False)):
+            if a != b:
+                return _first_leaf_diff(a, b, f"{path}[{i}]" if path else f"[{i}]")
+        if len(old) != len(new):
+            return path or "$", f"list length {len(old)} → {len(new)}"
+    return path or "$", f"{_short(old)} → {_short(new)}"
 
 
 def _try_json(text: str):
@@ -225,12 +415,13 @@ def _value_drift(old_text: str, new_text: str) -> str | None:
     return None
 
 
-def _numbers(text: str) -> list[tuple[str, float]]:
+def _numbers(text: str) -> list[tuple[str, Decimal]]:
+    # Decimal, not float: 9007199254740993 and ...92 must not compare equal
     out = []
     for token in _NUMBER_RE.findall(text):
         try:
-            out.append((token, float(token.lstrip("$").replace(",", ""))))
-        except ValueError:
+            out.append((token, Decimal(token.lstrip("$").replace(",", ""))))
+        except InvalidOperation:
             continue
     return out
 

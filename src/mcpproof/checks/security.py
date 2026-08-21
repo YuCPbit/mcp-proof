@@ -12,6 +12,7 @@ import json
 import re
 
 from ..client import RawProbe
+from ..schemas import iter_properties
 from .base import FAIL, MUST, PASS, SHOULD, WARN, CheckResult
 
 _META: dict[str, tuple[str, str, str, str]] = {
@@ -116,18 +117,22 @@ def _name(i: int, tool: dict) -> str:
 
 
 def _string_params(tool: dict) -> list[tuple[str, dict]]:
-    """(name, schema) for every string-typed property in the tool's inputSchema."""
+    """(path, effective schema) for every string-typed property reachable in
+    the tool's inputSchema — through ``$ref``, ``allOf``, nested objects,
+    array items and ``anyOf``/``oneOf`` branches, so an injection surface
+    like ``config.shell.command`` cannot hide one level down."""
     schema = tool.get("inputSchema")
-    props = schema.get("properties") if isinstance(schema, dict) else None
-    if not isinstance(props, dict):
+    if not isinstance(schema, dict):
         return []
-    out = []
-    for pname, pschema in props.items():
-        if not isinstance(pschema, dict):
+    out: list[tuple[str, dict]] = []
+    seen: set[str] = set()
+    for path, pschema in iter_properties(schema):
+        if path in seen:
             continue
         ptype = pschema.get("type")
         if ptype == "string" or (isinstance(ptype, list) and "string" in ptype):
-            out.append((pname, pschema))
+            seen.add(path)
+            out.append((path, pschema))
     return out
 
 
