@@ -151,13 +151,21 @@ def test_github_action_yaml_is_a_paste_ready_gate():
 
 
 def test_replay_order_follows_manifest_not_alphabet(tmp_path):
+    from mcpproof.provenance import obj_hash
+    from mcpproof.regression.recorder import SCHEMA_VERSION
     from mcpproof.regression.replayer import verify_fixture_set
 
-    fixture = {"tool": "t", "args": {}, "response": {"is_error": False, "content": []}}
+    contract = {"tool": "t", "args": {}, "response": {"is_error": False, "content": []}}
+    fixture = dict(contract, contract_sha256=obj_hash(contract), schema_version=SCHEMA_VERSION)
     for name in ("a_get.json", "z_save.json"):
         (tmp_path / name).write_text(json.dumps(fixture), encoding="utf-8")
     (tmp_path / "_manifest.json").write_text(
-        json.dumps({"fixtures": ["z_save.json", "a_get.json"]}), encoding="utf-8"
+        json.dumps({
+            "schema_version": SCHEMA_VERSION,
+            "fixtures": ["z_save.json", "a_get.json"],
+            "fixtures_sha256": obj_hash([fixture["contract_sha256"]] * 2),
+        }),
+        encoding="utf-8",
     )
     paths, problems = verify_fixture_set(tmp_path)
     assert [p.name for p in paths] == ["z_save.json", "a_get.json"]

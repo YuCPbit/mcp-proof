@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.7.2 — 2026-08-22
+
+Truthfulness patch: v0.7.1 taught the auditor to say "I don't know"; v0.7.2
+makes sure nothing the auditor DID say can be quietly rewritten. Driven by a
+third external review — every claim verified against the code first, and two
+of its findings reproduced as live attacks before being fixed (the derived-
+field edit and the hash-stripping downgrade below).
+
+- **`verify` now fingerprints the whole document (report schema v3).** The
+  v2 run hash covered a curated field list — check verdicts, drifts,
+  evidence — which left every derived field editable without breaking
+  verification: `verdict.ship_ready`, `audit.status`, `must_ok/must_total`,
+  the security counters, the entire MSSS table, `next_steps`. A report
+  edited to claim "99/99 MUST · SHIP-READY" verified as intact. The v3 run
+  hash is built by subtraction instead of enumeration: the whole model minus
+  the two fingerprints themselves and the volatile `observation` block
+  (latency advisory rows and their summary counter stay excluded, as in
+  the behaviour hash) — so a field added to the model later is hashed by
+  default instead of silently joining the editable set. Stored v2 reports
+  still verify under their frozen original recipe with an explicit coverage
+  note; flipping the version field just selects a recipe that disagrees
+  with the stored hash; schemas newer than the tool are refused (exit 2).
+  `verify`'s help and the README now call this what it is — an internal-
+  consistency check, not a signature.
+- **Deleting a fixture's hash no longer disarms the integrity gate.** The
+  pre-v3 compatibility path keyed off each fixture's own `contract_sha256`
+  field: stripping that one field from a tampered fixture inside a current
+  v4 set skipped its per-fixture check *and* the whole set's aggregate
+  fingerprint check — zero warnings, tampered baseline replayed as truth
+  (reproduced live before fixing). Hash requirements now key off the
+  manifest's schema version: in a v3+ set, a hashless fixture is an
+  integrity ERROR like any other tamper. Legacy sets (manifest schema < 3)
+  can never be verified, so they now fail closed by default with
+  re-record instructions; `--allow-legacy-fixtures` (on `run` and `replay`)
+  opts in explicitly.
+- **Integrity failures abort the replay instead of posing as drift.**
+  `replay()` raises `FixtureIntegrityError` before the server is even
+  launched; previously integrity problems were merged into the drift list,
+  where they read as target behaviour and exited 1. This also ends the
+  best-effort replay after a missing manifest, which replayed in glob order
+  and could manufacture false drift for stateful sequences.
+- **One exit-code taxonomy for every command.** `run`'s 0/1/2 discipline now
+  holds CLI-wide via a dispatch boundary: `record`/`inspect`/`plan`/`diff`
+  failures that used to escape as Python tracebacks (dead server command,
+  unreadable files) become one stable line and exit 2; `replay` on a
+  missing or unverifiable baseline is exit 2, matching `run` (the same fact
+  used to be exit 2 from `run` but exit 1 from `replay`). Exit 1 is
+  reserved for one meaning only: the audit completed and the target failed
+  it. `MCP_PROOF_DEBUG=1` re-raises full tracebacks for debugging.
+- **README truth pass**: `verify` described as fingerprint recheck, not
+  "prove the report wasn't edited"; test count 107 → 140 (21 new
+  adversarial tests in `tests/test_v072.py`); MSSS described precisely as
+  a 24-entry control matrix (23 fully documented + the `MCP-DEPLOY-04`
+  future-control placeholder); JSON output labelled schema v3.
+
 ## 0.7.1 — 2026-08-22
 
 Release hardening: v0.7 taught the audit to fail closed on bad data; v0.7.1

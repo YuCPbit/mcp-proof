@@ -11,6 +11,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from _paths import venv_python
 
 from mcpproof.checks.base import FAIL, MUST, PASS, SKIP, CheckResult
@@ -72,8 +73,12 @@ def test_run_hash_ignores_latency_advisories(tmp_path):
     assert "1 latency advisory" in noisy_html
 
 
-async def test_v2_fixtures_still_replay(tmp_path):
-    """Fixtures recorded before the contract/observation split keep replaying."""
+async def test_legacy_v2_fixtures_fail_closed_unless_opted_in(tmp_path):
+    """Fixtures recorded before contract hashing cannot be integrity-verified,
+    so by default they are refused as a gate baseline; --allow-legacy-fixtures
+    opts in and they still replay correctly."""
+    from mcpproof.errors import FixtureIntegrityError
+
     await record(REGRESSION_SERVER, tmp_path)
     for p in tmp_path.glob("*.json"):
         if p.name.startswith("_"):
@@ -87,7 +92,16 @@ async def test_v2_fixtures_still_replay(tmp_path):
         fixture["recorded_at"] = observation["recorded_at"]
         fixture["server_cmd"] = observation["server_cmd"]
         p.write_text(json.dumps(fixture), encoding="utf-8")
-    results = await replay(REGRESSION_SERVER, tmp_path)
+    manifest_path = tmp_path / "_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = 2
+    manifest.pop("fixtures_sha256", None)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(FixtureIntegrityError, match="legacy fixture schema"):
+        await replay(REGRESSION_SERVER, tmp_path)
+
+    results = await replay(REGRESSION_SERVER, tmp_path, allow_legacy=True)
     summary = summarize(results)
     assert summary["gate_pass"] is True
     assert summary["ok"] == 3 and summary["content_total"] == 3

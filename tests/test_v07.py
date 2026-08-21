@@ -212,13 +212,16 @@ def test_stale_extra_fixture_is_flagged_and_not_replayed(recorded_baseline, tmp_
     assert not _gate(problems)
 
 
-async def test_missing_manifest_fails_gate_but_still_replays(recorded_baseline, tmp_path):
+async def test_missing_manifest_aborts_replay_fail_closed(recorded_baseline, tmp_path):
+    """No manifest → no trusted replay order and no aggregate fingerprint;
+    v0.7.2 aborts instead of best-effort replaying in glob order, which
+    would manufacture false drift for stateful sequences."""
+    from mcpproof.errors import FixtureIntegrityError
+
     fdir = _copy(recorded_baseline, tmp_path)
     (fdir / "_manifest.json").unlink()
-    results = await replay(REGRESSION_SERVER, fdir)
-    summary = summarize(results)
-    assert summary["error"] == 1 and not summary["gate_pass"]
-    assert summary["ok"] == 3, "best-effort replay still shows what drifted"
+    with pytest.raises(FixtureIntegrityError, match="manifest missing"):
+        await replay(REGRESSION_SERVER, fdir)
 
 
 def test_intact_baseline_verifies_clean(recorded_baseline):

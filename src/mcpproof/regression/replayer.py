@@ -4,8 +4,11 @@ Before anything is replayed, ``verify_fixture_set`` proves the fixture set
 is the one that was recorded: manifest present and readable, every listed
 fixture on disk, no duplicates or stale extras, every contract hash
 recomputed and matching, the aggregate fingerprint intact. Any integrity
-failure is an ERROR row — the gate fails closed instead of silently
-replaying whatever happens to be on disk.
+failure aborts the replay with ``FixtureIntegrityError`` — never drift
+rows: a baseline that cannot be verified must not gate anything, because
+drift measured against it would blame the target for the baseline's
+problems (and with no trusted manifest order, stateful sequences would
+replay in the wrong order and manufacture false drift).
 
 Verdict ladder per fixture: ERROR (integrity / tool gone / call raised)
 beats BREAKING (shape changed) beats VALUE (any observed value changed —
@@ -24,6 +27,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from ..errors import FixtureIntegrityError
 from ..provenance import obj_hash
 from .recorder import MANIFEST_NAME, SCHEMA_VERSION, normalize_response
 
@@ -47,21 +51,26 @@ def _contract_of(fixture: dict) -> dict:
     return {"tool": fixture["tool"], "args": fixture["args"], "response": fixture["response"]}
 
 
-def verify_fixture_set(fixtures_dir: Path) -> tuple[list[Path], list[DriftResult]]:
+def verify_fixture_set(
+    fixtures_dir: Path, allow_legacy: bool = False
+) -> tuple[list[Path], list[DriftResult]]:
     """Fail-closed integrity gate over a fixture set.
 
     Returns ``(paths to replay, integrity problems)``. Paths come back in
     manifest order (recording order — stateful sequences depend on it) and
     exclude anything that failed verification: a missing manifest, a listed
     fixture missing from disk, a fixture whose recomputed contract hash
-    disagrees with its stored one, a manifest fingerprint that no longer
-    matches the recorded contracts, duplicates, and stale extras all become
-    ERROR rows that fail the gate.
+    disagrees with its stored one — or that lacks a stored hash a v3+
+    manifest requires it to have (deleting ``contract_sha256`` must not
+    disarm the very check that would have caught the edit) — a manifest
+    fingerprint that no longer matches the recorded contracts, duplicates,
+    and stale extras all become ERROR rows.
 
-    Compatibility: fixtures older than v3 predate ``contract_sha256`` — their
-    content cannot be hash-verified, so per-fixture and aggregate checks are
-    skipped for them (they still replay). v3 manifests aggregated sorted
-    hashes; v4 aggregates in recording order.
+    Legacy sets (manifest schema < 3) predate contract hashing entirely and
+    can never be integrity-verified. By default that is itself an ERROR —
+    re-record the baseline; ``allow_legacy`` opts in to replaying them with
+    per-fixture and aggregate hash checks skipped. v3 manifests aggregated
+    sorted hashes; v4 aggregates in recording order.
     """
     problems: list[DriftResult] = []
     on_disk = {
@@ -95,6 +104,16 @@ def verify_fixture_set(fixtures_dir: Path) -> tuple[list[Path], list[DriftResult
         ))
         return [], problems
 
+    hashed_schema = isinstance(manifest_version, int) and manifest_version >= 3
+    if not hashed_schema and not allow_legacy:
+        problems.append(DriftResult(
+            MANIFEST_NAME, "?", "ERROR",
+            f"legacy fixture schema ({manifest_version!r}) predates contract hashing and "
+            "cannot be integrity-verified — re-record the baseline with this mcp-proof, "
+            "or pass --allow-legacy-fixtures to replay it without integrity checks",
+        ))
+        return [], problems
+
     for name in sorted(n for n, c in Counter(listed).items() if c > 1):
         problems.append(DriftResult(
             name, "?", "ERROR", "manifest lists this fixture more than once",
@@ -125,7 +144,19 @@ def verify_fixture_set(fixtures_dir: Path) -> tuple[list[Path], list[DriftResult
             continue
         stored = fixture.get("contract_sha256")
         if stored is None:
-            # pre-v3 fixture: recorded before the hash discipline existed
+            if hashed_schema:
+                # deleting the hash must not disarm the check it feeds: an
+                # unverifiable fixture inside a hashed set is treated exactly
+                # like a tampered one (this was a real downgrade bypass)
+                problems.append(DriftResult(
+                    name, fixture.get("tool") or "?", "ERROR",
+                    f"fixture lacks contract_sha256 but the manifest declares schema "
+                    f"v{manifest_version} — integrity-stripped or hand-edited; a fixture "
+                    "that cannot be verified is not replayed as truth",
+                ))
+                hashes_verifiable = False
+                continue
+            # pre-v3 fixture, replayed under an explicit --allow-legacy-fixtures
             hashes_verifiable = False
         elif stored != contract_hash:
             problems.append(DriftResult(
@@ -160,12 +191,18 @@ def verify_fixture_set(fixtures_dir: Path) -> tuple[list[Path], list[DriftResult
 
 async def replay(
     cmd: list[str] | None, fixtures_dir: str | Path, url: str | None = None,
-    era: str = "auto",
+    era: str = "auto", allow_legacy: bool = False,
 ) -> list[DriftResult]:
+    """Raises FixtureIntegrityError (before the server is even launched)
+    when the baseline fails verification — drift is only ever measured
+    against a baseline that proved intact."""
     from .recorder import _session_ctx, list_all_tools
 
     fixtures_dir = Path(fixtures_dir)
-    paths, results = verify_fixture_set(fixtures_dir)
+    paths, problems = verify_fixture_set(fixtures_dir, allow_legacy=allow_legacy)
+    if problems:
+        raise FixtureIntegrityError(problems)
+    results: list[DriftResult] = []
     async with await _session_ctx(cmd, url, era) as session:
         try:
             available = {t.name for t in await list_all_tools(session)}

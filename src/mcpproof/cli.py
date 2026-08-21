@@ -49,6 +49,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Also record write/delete/exec-style tools when creating a baseline (default: skip them)",
     )
     run_p.add_argument(
+        "--allow-legacy-fixtures", action="store_true",
+        help="Replay pre-v3 fixtures that predate contract hashing. Default is to fail: "
+             "their integrity cannot be verified, so they are not accepted as a gate baseline",
+    )
+    run_p.add_argument(
         "--edge-cases", action="store_true",
         help="Baseline boundary inputs too (long strings, injection probes, empty strings)",
     )
@@ -84,6 +89,10 @@ def main(argv: list[str] | None = None) -> int:
              "(default: auto)",
     )
     rep_p.add_argument("--fixtures", default="fixtures")
+    rep_p.add_argument(
+        "--allow-legacy-fixtures", action="store_true",
+        help="Replay pre-v3 fixtures that predate contract hashing (integrity checks skipped)",
+    )
 
     plan_p = sub.add_parser("plan", help="Show which tools auto-baselining would call, and why")
     plan_p.add_argument("server_cmd", nargs="*")
@@ -114,7 +123,8 @@ def main(argv: list[str] | None = None) -> int:
 
     ver_p = sub.add_parser(
         "verify",
-        help="Verify a JSON report's fingerprints offline (exit 1 if it was modified)",
+        help="Verify a report's internal fingerprints offline — a consistency check "
+             "(exit 1 on any post-audit edit), not a signature",
     )
     ver_p.add_argument("report", help="Report model JSON (from `mcp-proof run --json ...`)")
 

@@ -41,7 +41,7 @@ mcp-proof record python my_server.py --fixtures fixtures/      # 冻结行为契
 mcp-proof replay --fixtures fixtures/ -- python my_server.py   # 任何漂移即失败
 mcp-proof inspect python my_server.py --out baseline.json      # 冻结契约面
 mcp-proof diff baseline.json current.json                      # BREAKING / ADDITIVE / METADATA，破坏性变化 exit 1
-mcp-proof verify report.json                                   # 证明报告在审计后没被改过
+mcp-proof verify report.json                                   # 离线复核报告的内部指纹
 ```
 
 用内置的对照演示 60 秒看懂差别——一个干净的服务器 vs 一个埋了九处违规的服务器：
@@ -65,19 +65,19 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 审计工具必须比它审计的东西更值得信任。每个版本背后站着：
 
-- **107 个测试**，其中一整套对抗性测试打的就是审计器自己：藏在列表第二页的违规、被篡改的 fixtures 与 manifest、曾经漏网的漂移类别、不合法的合成基线。
+- **140 个测试**，其中一整套对抗性测试打的就是审计器自己：藏在列表第二页的违规、被篡改的 fixtures 与 manifest、删哈希降级攻击、改过结论横幅的报告、曾经漏网的漂移类别、不合法的合成基线。
 - **Linux / macOS / Windows × Python 3.11 / 3.12 / 3.13 全矩阵 CI**，外加打包岗位：构建 wheel、全新安装、对真实服务器跑一次真实审计，然后才允许发布。
 - **与官方 v2 SDK 双向互验**：官方客户端通过 `server/discover` 接纳 mcp-proof 手写的现代测试服务器；mcp-proof 对官方 v2 SDK 服务器在两种传输上全绿（`scripts/crosscheck_modern_server.py`）。
-- **Fail-closed 是设计原则**：分页走不完、fixture 被篡改、基线缺失、审计器内部出错——每一种都大声停下（exit `2`），绝不缩小审计范围继续跑，也绝不把自己的错算成服务器的错。
-- **报告可离线校验**：`mcp-proof verify report.json` 用报告自身字段重算两枚指纹，审计之后的任何改动都会被抓出。
+- **Fail-closed 是设计原则**：分页走不完、fixture 被篡改或无法验证、基线缺失、审计器内部出错——每一种都大声停下，而且每条命令用同一套分类学作答：exit `2` 加一行稳定输出，绝不冒 traceback，绝不缩小审计范围继续跑，也绝不把自己的错算成服务器的错。
+- **报告可离线校验**：`mcp-proof verify report.json` 用报告自身字段重算两枚指纹；文档指纹覆盖读者看到的一切——结论横幅、审计状态、汇总计数、MSSS 表、后续步骤——审计之后的任何改动都会破坏它。这是内部一致性证明，不是签名（签名 attestation 在路线图上）。
 
 ## ✨ 引擎盖下
 
 - 🔍 **覆盖全部面、全部分页、两个时代的线级检查** —— mcp-proof 直接对服务器说原始 JSON-RPC 并自动识别其时代：2026-07-28 现代时代 32 项（`server/discover`、`_meta` envelope 强制、`resultType`、所有可缓存结果的 `ttlMs`/`cacheScope`、-32022 版本拒绝、HTTP 路由 header 强制），initialize 握手时代 27 项——精确错误码、schema 合法性、结构化输出、stdout 卫生、三个列表面各自的分页安全、专门的 resources 与 prompts 车道，以及**验证过的负向探测**：TOOL-07 发送可证明违反 inputSchema 的输入（先证明基线合法、再只改动一个字段的最小复现），服务器若正常应答即告警——挂死不算拒绝，它是另一个发现。所有车道共用同一个分页采集器，藏在第二页的工具和第一页受到完全相同的审计。
-- 🛡️ **挂靠公开标准的安全审计** —— 6 项确定性检查（工具描述投毒、隐形/双向字符、凭据泄漏、无约束注入面、暴露任意执行）覆盖每一页广告出的每一个工具，schema 遍历器看穿 `$ref`/`allOf`/嵌套对象/数组元素——`config.shell.command` 藏一层也藏不住。每项映射到 24 控制项的 [MCP Server Security Standard](https://mcp-security-standard.org) 的规范控制 ID；合规表的结论从不超出证据：直接证据齐全才是 **met**，干净但间接的证据是 **partial**，检查够不到的控制项是 **manual review**。
-- 📼 **留给客户的回归套件——在评判别人之前先验证自己** —— 两个协议时代都能录制；黄金 fixtures 以 SHA-256 溯源冻结服务器行为，完整记录所有 content 类型（二进制 payload 存摘要，换掉一张图片不可能重放成 OK）。重放前有完整性门：逐个重算 contract 哈希并校验 manifest 指纹，缺失、被篡改、重复或来路不明的 fixture 都会让门禁失败，而不是被安静跳过。重放按严重度给漂移分级（`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`）——结构化字段或 JSON 值的任何变化至少是 `VALUE`，`"approved"→"denied"` 绝不可能以"外观差异"过关——并保持有状态调用顺序（fixture 文件名带序号、聚合指纹对顺序敏感）。基线绝不隐式创建：缺 fixtures 时 `run` 直接失败，除非显式传 `--record-if-missing`。
-- 📄 **人和机器都能读的报告** —— 自包含 HTML：吸顶导航、逐检查锚点（`report.html#SEC-03`）、关注/通过过滤器、证据范围卡片、可折叠 MSSS 矩阵；`--pdf` 供打印。同一份版本化模型可输出 `--json`（schema v2）、`--junit`（任意 CI）、`--sarif`（GitHub Security 页签）。
-- 🔁 **可复现是设计出来的** —— 零 LLM 调用、零 API key。两枚指纹，各司其职：`behavior_sha256` 只依赖服务器行为（检查结论、重放结论、协议事实——从不包含时间戳、延迟、启动命令或审计器版本），相同的服务器行为在任何机器上指纹相同；`run_hash` 额外冻结这次审计由什么构成。`mcp-proof verify` 可随时离线重证。验收靠验证，不靠信任。
+- 🛡️ **挂靠公开标准的安全审计** —— 6 项确定性检查（工具描述投毒、隐形/双向字符、凭据泄漏、无约束注入面、暴露任意执行）覆盖每一页广告出的每一个工具，schema 遍历器看穿 `$ref`/`allOf`/嵌套对象/数组元素——`config.shell.command` 藏一层也藏不住。每项映射到 [MCP Server Security Standard](https://mcp-security-standard.org) 24 条控制矩阵的规范控制 ID（23 条有完整文档，外加 `MCP-DEPLOY-04` 未来控制占位）；合规表的结论从不超出证据：直接证据齐全才是 **met**，干净但间接的证据是 **partial**，检查够不到的控制项是 **manual review**。
+- 📼 **留给客户的回归套件——在评判别人之前先验证自己** —— 两个协议时代都能录制；黄金 fixtures 以 SHA-256 溯源冻结服务器行为，完整记录所有 content 类型（二进制 payload 存摘要，换掉一张图片不可能重放成 OK）。重放前有完整性门：逐个重算 contract 哈希并校验 manifest 指纹，缺失、被篡改、重复或来路不明的 fixture 都会让重放整体中止，而不是被安静跳过——删掉 fixture 自带的哈希按篡改论处、不当作旧版本，早于契约哈希的 legacy 基线默认拒绝，除非显式传 `--allow-legacy-fixtures`。重放按严重度给漂移分级（`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`）——结构化字段或 JSON 值的任何变化至少是 `VALUE`，`"approved"→"denied"` 绝不可能以"外观差异"过关——并保持有状态调用顺序（fixture 文件名带序号、聚合指纹对顺序敏感）。基线绝不隐式创建：缺 fixtures 时 `run` 直接失败，除非显式传 `--record-if-missing`。
+- 📄 **人和机器都能读的报告** —— 自包含 HTML：吸顶导航、逐检查锚点（`report.html#SEC-03`）、关注/通过过滤器、证据范围卡片、可折叠 MSSS 矩阵；`--pdf` 供打印。同一份版本化模型可输出 `--json`（schema v3）、`--junit`（任意 CI）、`--sarif`（GitHub Security 页签）。
+- 🔁 **可复现是设计出来的** —— 零 LLM 调用、零 API key。两枚指纹，各司其职：`behavior_sha256` 只依赖服务器行为（检查结论、重放结论、协议事实——从不包含时间戳、延迟、启动命令或审计器版本），相同的服务器行为在任何机器上指纹相同；`run_hash` 冻结整份报告文档——证据、结论横幅、审计状态、汇总、MSSS 表——只豁免易变的时间戳块。`mcp-proof verify` 可随时离线复核两者：这是任何事后改动都会破坏的内部一致性证明，不是签名。验收靠验证，不靠信任。
 - 🧯 **annotations 优先的调用规划** —— MCP 工具注解双向覆盖名称启发式：`readOnlyHint` 救回会被正则误拦的只读工具，`destructiveHint` 抓住正则漏掉的写型工具；无注解才回退保守启发式。`mcp-proof plan` 在碰生产环境之前就告诉你自动基线会调用什么、依据是什么；`--include-destructive` 与 `--edge-cases` 按需放行更多。
 - 📋 **给 CI 的契约 diff** —— `mcp-proof inspect` 把服务面（capabilities + tools + resources + prompts，翻页收齐，"未提供"与"提供但为空"分开记录）冻结成带指纹的 manifest——任何一个面的分页走不完就整体拒绝落盘，因为把半个面冻结成"基线"会让此后针对缺失那一半的所有 diff 都失明。易变的线级元数据按**位置**清理而非按键名全树删除，用户 schema 里恰好叫 `ttlMs` 或 `nextCursor` 的属性是契约的一部分，原样保留。`mcp-proof diff` 把每处变化归为 `BREAKING` / `ADDITIVE` / `METADATA`，出现破坏性变化即非零退出——schema 收紧、enum 收窄、optional 变 required、输出字段消失、安全注解弱化都算数。
 
@@ -111,7 +111,7 @@ mcp-proof 存在的意义是官方套件不做的那一半：**交付证据**。
 ## ⚙️ 一步接入 CI
 
 ```yaml
-- uses: YuCPbit/mcp-proof@v0.7.1
+- uses: YuCPbit/mcp-proof@v0.7.2
   with:
     server-command: python my_server.py
     fixtures: fixtures/
@@ -135,7 +135,7 @@ mcp-proof 存在的意义是官方套件不做的那一半：**交付证据**。
 
 | | |
 |---|---|
-| **当前 —— v0.7.1** | 发布硬化：审计器错误分类学（`INCONCLUSIVE` ≠ 服务器失败，exit `2`）、基线 fail-closed（`--record-if-missing`）、离线 `verify`、证据范围卡片 |
+| **当前 —— v0.7.2** | 求真补丁：`verify` 指纹覆盖整份文档（report schema v3——改过的结论横幅、审计状态、汇总与 MSSS 表不再能通过校验）、删 fixture 哈希按篡改论处、legacy 基线 fail-closed（`--allow-legacy-fixtures`）、全部命令统一 exit-code 分类学 |
 | **下一步 —— v0.8** | 2026-07-28 纵深：MRTR `input_required` 回合流程、`subscriptions/listen` · CI 内与官方 conformance 套件交叉验证 |
 | **更远** | 签名证据包（attestation）· 可选语义车道（LLM 评分断言）——等确定性核心完工后再排期 |
 

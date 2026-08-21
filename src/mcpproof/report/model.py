@@ -3,18 +3,23 @@
 Single source of truth for every output format: the HTML template, the JSON
 artifact, JUnit and SARIF are all rendered from this dict.
 
-Two fingerprints, two questions (schema v2):
+Two fingerprints, two questions (schema v3):
 
 * ``behavior_sha256`` — *what did the server do?* Check verdicts
   (id/level/status), non-latency drift verdicts, protocol facts. Evidence
   strings stay out (failure evidence embeds stderr tails and other
   environment noise), as do the auditor's version and the launch command —
   identical server behaviour fingerprints identically across machines.
-* ``run_hash`` — *what did this audit run consist of?* Everything above plus
-  the mcp-proof version, the server command and the full evidence text.
+* ``run_hash`` — *what does this report say?* The whole document minus the
+  two fingerprints themselves and the volatile ``observation`` block: checks
+  with their evidence, the verdict banner, audit status, summary counters,
+  the MSSS table, next steps. Schema v2 hashed a curated field list instead,
+  which left every derived field editable without breaking verification —
+  v3 exists to close that.
 
-Neither ever includes timestamps or latency measurements; volatile context
-lives under ``observation``.
+Neither fingerprint ever includes timestamps or latency measurements;
+volatile context lives under ``observation``, and latency advisory rows
+(plus their summary counter) are filtered before hashing.
 """
 
 from dataclasses import asdict, is_dataclass
@@ -23,9 +28,10 @@ from datetime import UTC, datetime
 from .. import KNOWN_SPECS, LATEST_LEGACY_SPEC, __version__
 from ..checks.base import FAIL, MUST, PASS, SHOULD, SKIP, WARN
 from ..checks.msss import evaluate_msss
+from ..errors import UnsupportedReportSchema
 from ..provenance import obj_hash
 
-REPORT_SCHEMA_VERSION = 2
+REPORT_SCHEMA_VERSION = 3
 
 
 def _as_dicts(results: list) -> list[dict]:
@@ -58,6 +64,9 @@ def _behavior_hash_input(negotiated_protocol, protocol_era, conf, sec, reg) -> d
 
 def _run_hash_input(tool_version, server_cmd, negotiated_protocol, protocol_era,
                     conf, sec, reg) -> dict:
+    # FROZEN: the schema-v2 run-hash recipe, kept verbatim so `verify` can
+    # still check reports written by mcp-proof ≤ 0.7.1. New fields go into
+    # _document_hash_input (v3), never here.
     return {
         "tool": {"name": "mcp-proof", "version": tool_version},
         "server_cmd": server_cmd,
@@ -72,14 +81,51 @@ def _run_hash_input(tool_version, server_cmd, negotiated_protocol, protocol_era,
     }
 
 
+# the run fingerprint covers everything EXCEPT itself, its sibling, and the
+# volatile observation block (generated_at timestamp)
+_DOC_HASH_EXCLUDED = ("behavior_sha256", "run_hash", "observation")
+
+
+def _document_hash_input(model: dict) -> dict:
+    """Schema v3 run-hash input: the whole report document minus its own
+    fingerprints and ``observation``. Built by subtraction, not enumeration,
+    so a field added to the model later is hashed by default instead of
+    silently joining the editable set. Latency rows carry live measurements —
+    they and their summary counter are filtered, exactly as the behaviour
+    hash filters them, so a latency advisory never changes a fingerprint."""
+    doc = {k: v for k, v in model.items() if k not in _DOC_HASH_EXCLUDED}
+    reg = doc.get("regression")
+    if reg:
+        reg = dict(reg)
+        reg["drifts"] = _non_latency_drifts(reg)
+        summary = dict(reg.get("summary") or {})
+        summary.pop("latency", None)
+        reg["summary"] = summary
+        doc["regression"] = reg
+    return doc
+
+
 def recompute_hashes(model: dict) -> tuple[str, str]:
     """Recompute (behavior_sha256, run_hash) from a stored report model.
 
     The JSON model is self-contained: every hash input is a field it carries,
-    so `mcp-proof verify` can prove offline that neither the verdicts nor the
-    recorded audit inputs were edited after the report was written. Keys are
-    canonicalized by obj_hash, so a JSON round-trip never changes the answer.
+    so `mcp-proof verify` can check offline that nothing fingerprinted was
+    edited after the report was written. Keys are canonicalized by obj_hash,
+    so a JSON round-trip never changes the answer. The run-hash recipe is
+    selected by the report's own schema version: v3 covers the whole document
+    (verdict banner, audit status, summaries, MSSS, next steps included);
+    v2 reports keep their original curated-field recipe, which covered check
+    verdicts, drifts and evidence only. Editing the version field buys
+    nothing — either recipe's recomputation then disagrees with the stored
+    hash. Raises UnsupportedReportSchema for versions newer than this build.
     """
+    version = model.get("report_schema_version")
+    version = version if isinstance(version, int) else 2
+    if version > REPORT_SCHEMA_VERSION:
+        raise UnsupportedReportSchema(
+            f"report declares schema v{version}, newer than this mcp-proof "
+            f"understands (≤{REPORT_SCHEMA_VERSION}) — upgrade mcp-proof to verify it"
+        )
     server = model["server"]
     # pass the stored dicts through untouched: they are the very objects the
     # build hashed, so any extra/missing key is a difference we WANT to catch
@@ -87,10 +133,13 @@ def recompute_hashes(model: dict) -> tuple[str, str]:
     sec = model["security"]["checks"]
     reg = model.get("regression")
     behavior = obj_hash(_behavior_hash_input(server["revision"], server["era"], conf, sec, reg))
-    run = obj_hash(_run_hash_input(
-        model["tool"]["version"], server["cmd"], server["revision"], server["era"],
-        conf, sec, reg,
-    ))
+    if version >= 3:
+        run = obj_hash(_document_hash_input(model))
+    else:
+        run = obj_hash(_run_hash_input(
+            model["tool"]["version"], server["cmd"], server["revision"], server["era"],
+            conf, sec, reg,
+        ))
     return behavior, run
 
 
@@ -183,10 +232,6 @@ def build_model(
     behavior_sha256 = obj_hash(
         _behavior_hash_input(negotiated_protocol, protocol_era, conf, sec, reg)
     )
-    run_hash = obj_hash(
-        _run_hash_input(__version__, server_cmd, negotiated_protocol, protocol_era,
-                        conf, sec, reg)
-    )
 
     if protocol_era == "modern":
         era_label = f"modern era ({discovery or 'server/discover'})"
@@ -214,17 +259,19 @@ def build_model(
     else:
         next_steps = _next_steps(conf, sec, reg)
 
-    return {
+    model = {
         "report_schema_version": REPORT_SCHEMA_VERSION,
         "tool": {"name": "mcp-proof", "version": __version__},
-        # status/error stay out of both hashes: they describe this run's
-        # completeness, not the target's behaviour or the audit's inputs
+        # status/error stay out of the behaviour hash (they describe this
+        # run's completeness, not the target's behaviour) but the document
+        # hash below covers them: a report edited from "inconclusive" to
+        # "complete" must not verify
         "audit": {
             "status": "inconclusive" if audit_error else "complete",
             "error": audit_error or "",
         },
         "behavior_sha256": behavior_sha256,
-        "run_hash": run_hash,
+        "run_hash": "",  # filled below, once the document it covers exists
         "server": {
             "name": server_name,
             "cmd": list(server_cmd),
@@ -251,3 +298,5 @@ def build_model(
         # context, never hashed
         "observation": {"generated_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")},
     }
+    model["run_hash"] = obj_hash(_document_hash_input(model))
+    return model

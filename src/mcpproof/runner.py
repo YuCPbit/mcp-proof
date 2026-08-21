@@ -1,9 +1,11 @@
 """Orchestrates the lanes behind the CLI commands.
 
-Exit-code taxonomy (run/replay): 0 = audit completed, target ship-ready;
-1 = audit completed, target failed it; 2 = audit did not complete — missing
-baseline, auditor internal error, or a lane that could not finish. A 2 is
-never evidence against the target.
+Exit-code taxonomy, enforced for every command by the dispatch boundary at
+the bottom of this module: 0 = completed, target passed; 1 = completed,
+target failed it; 2 = the command did not complete — missing baseline,
+failed fixture integrity, unreachable environment, or an internal error.
+A 2 is never evidence against the target, and no failure mode escapes as a
+raw traceback (set MCP_PROOF_DEBUG=1 to get one back).
 """
 
 import asyncio
@@ -15,11 +17,8 @@ import sys
 from pathlib import Path
 
 from .checks.base import FAIL, MUST
+from .errors import BaselineMissingError, FixtureIntegrityError, UnsupportedReportSchema
 from .report.builder import build_report
-
-
-class BaselineMissingError(RuntimeError):
-    """`run --fixtures` pointed at a directory with no recorded baseline."""
 
 
 def _find_chrome() -> str | None:
@@ -96,7 +95,8 @@ async def _regression_lane(args, cmd: list[str] | None, url: str | None, era: st
             print(f"  ⚠ skipped {len(unsynthesizable)} tool(s) with no schema-valid "
                   f"synthesizable arguments: {'; '.join(unsynthesizable)}")
     print("→ regression lane: replaying fixtures")
-    drifts = await replay(cmd, fdir, url=url, era=era)
+    drifts = await replay(cmd, fdir, url=url, era=era,
+                          allow_legacy=getattr(args, "allow_legacy_fixtures", False))
     fixtures_sha = ""
     if manifest.exists():
         fixtures_sha = json.loads(manifest.read_text()).get("fixtures_sha256", "")
@@ -147,7 +147,7 @@ async def _cmd_run(args) -> int:
         # rides the same verdict instead of sniffing again
         try:
             regression = await _regression_lane(args, cmd, url, era=outcome.era)
-        except BaselineMissingError as exc:
+        except (BaselineMissingError, FixtureIntegrityError) as exc:
             print(f"✗ audit did not complete — {exc}")
             return 2
         except Exception as exc:
@@ -292,12 +292,12 @@ async def _cmd_record(args) -> int:
 
 
 async def _cmd_verify(args) -> int:
-    """Recompute a stored JSON report model's fingerprints offline.
+    """Recompute a stored JSON report model's internal fingerprints offline.
 
     The model is self-contained: both hashes are derived from fields it
-    carries, so a match proves neither the verdicts (behaviour fingerprint)
-    nor the recorded audit inputs (run fingerprint) were edited after the
-    report was written. No server, no network.
+    carries, so a mismatch proves the document was edited after it was
+    written. This is a consistency check, not a signature — it cannot prove
+    who produced the report. No server, no network.
     """
     from .report.model import recompute_hashes
 
@@ -315,6 +315,8 @@ async def _cmd_verify(args) -> int:
     except (KeyError, TypeError) as exc:
         print(f"✗ report model is missing hash inputs ({exc}) — truncated or hand-edited")
         return 1
+    version = model.get("report_schema_version")
+    version = version if isinstance(version, int) else 2
     ok_behavior = behavior == model.get("behavior_sha256")
     ok_run = run_hash == model.get("run_hash")
     print(f"behaviour fingerprint  {'✓ verified' if ok_behavior else '✗ MISMATCH'}"
@@ -322,7 +324,14 @@ async def _cmd_verify(args) -> int:
     print(f"audit-run fingerprint  {'✓ verified' if ok_run else '✗ MISMATCH'}"
           f"  sha256:{model.get('run_hash', '')[:20]}…")
     if ok_behavior and ok_run:
-        print("✓ report intact: verdicts and recorded audit inputs match their fingerprints")
+        if version < 3:
+            print("note: schema v2 report — its fingerprints cover check verdicts, drifts "
+                  "and evidence, but NOT derived fields (verdict banner, summaries, MSSS "
+                  "table, next steps); re-audit with mcp-proof ≥ 0.7.2 for full coverage")
+            print("✓ report intact within schema v2 coverage")
+            return 0
+        print("✓ report intact: every fingerprinted field matches — verdicts, evidence, "
+              "summaries and derived sections")
         return 0
     print("✗ report was modified after it was written (or produced by an incompatible mcp-proof)")
     return 1
@@ -332,7 +341,8 @@ async def _cmd_replay(args) -> int:
     from .regression.replayer import replay, summarize
 
     drifts = await replay(args.server_cmd or None, Path(args.fixtures),
-                          url=getattr(args, "url", None), era=getattr(args, "era", "auto"))
+                          url=getattr(args, "url", None), era=getattr(args, "era", "auto"),
+                          allow_legacy=getattr(args, "allow_legacy_fixtures", False))
     summary = summarize(drifts)
     for d in drifts:
         if d.kind != "OK":
@@ -345,10 +355,45 @@ async def _cmd_replay(args) -> int:
     return 0 if summary["gate_pass"] else 1
 
 
+def _unwrap(exc: BaseException) -> BaseException:
+    # anyio task groups (inside the MCP SDK) wrap the real cause
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
+
+
 def dispatch(args) -> int:
+    """Run the command behind a uniform failure boundary.
+
+    Handlers return 0/1 verdicts themselves; anything that ESCAPES a handler
+    means the command did not complete, which is exit 2 with one stable line
+    — never a traceback (MCP_PROOF_DEBUG=1 re-raises for debugging), and
+    never exit 1, because 1 would read as evidence against the target.
+    """
     handler = {
         "run": _cmd_run, "record": _cmd_record, "replay": _cmd_replay,
         "plan": _cmd_plan, "inspect": _cmd_inspect, "diff": _cmd_diff,
         "verify": _cmd_verify,
     }[args.command]
-    return asyncio.run(handler(args))
+    try:
+        return asyncio.run(handler(args))
+    except KeyboardInterrupt:
+        raise
+    # SystemExit stays untouched; BaseExceptionGroup is not an Exception but
+    # anyio raises it around the real cause, so it needs its own clause
+    except (Exception, BaseExceptionGroup) as raw:
+        if os.environ.get("MCP_PROOF_DEBUG"):
+            raise
+        exc = _unwrap(raw)
+        if isinstance(exc, KeyboardInterrupt):
+            raise
+        if isinstance(exc, (BaselineMissingError, FixtureIntegrityError, UnsupportedReportSchema)):
+            detail = str(exc)
+        elif isinstance(exc, (OSError, TimeoutError)):
+            # environment failures: server command not found, connection refused…
+            detail = f"{type(exc).__name__}: {exc}"
+        else:
+            detail = (f"internal error, not target behaviour ({type(exc).__name__}: {exc}) "
+                      f"— set MCP_PROOF_DEBUG=1 for the traceback")
+        print(f"✗ {args.command} did not complete — {detail}")
+        return 2

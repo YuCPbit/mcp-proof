@@ -34,7 +34,7 @@ def test_all_output_formats_clean_server(tmp_path):
     html_path, paths = _run(tmp_path, MODERN, expect_exit=0)
 
     model = json.loads(paths["json"].read_text(encoding="utf-8"))
-    assert model["report_schema_version"] == 2
+    assert model["report_schema_version"] == 3
     assert model["verdict"]["ship_ready"] is True
     assert model["server"]["era"] == "modern"
     assert model["run_hash"] and model["behavior_sha256"]
