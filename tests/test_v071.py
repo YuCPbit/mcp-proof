@@ -177,9 +177,13 @@ def test_verify_catches_edited_evidence_even_when_verdicts_stand(recorded_run, t
     proc = run_cli("verify", str(tampered))
     assert proc.returncode == 1
     # verdicts untouched → behaviour fingerprint still verifies; the audit-run
-    # fingerprint covers the evidence text and catches the edit
-    assert "behaviour fingerprint  ✓ verified" in proc.stdout
-    assert "audit-run fingerprint  ✗ MISMATCH" in proc.stdout
+    # fingerprint covers the evidence text and catches the edit. Assert on the
+    # words, not the ✓/✗ glyphs — Windows consoles replace them with '?'
+    lines = proc.stdout.splitlines()
+    behaviour_line = next(line for line in lines if line.startswith("behaviour fingerprint"))
+    run_line = next(line for line in lines if line.startswith("audit-run fingerprint"))
+    assert "verified" in behaviour_line and "MISMATCH" not in behaviour_line
+    assert "MISMATCH" in run_line
 
 
 def test_verify_rejects_non_reports(tmp_path):
