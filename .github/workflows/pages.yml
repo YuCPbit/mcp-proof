@@ -1,0 +1,42 @@
+# Publishes the demo audit reports as live pages — GitHub renders repo HTML
+# files as source code, so the showcase links in the README point here instead.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "demo/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble site from demo artifacts
+        run: |
+          mkdir -p _site
+          cp demo/report-*.html _site/
+          cp demo/report-*.pdf _site/ 2>/dev/null || true
+          cp demo/report-filesystem.png demo/architecture.svg _site/ 2>/dev/null || true
+          cp demo/pages-index.html _site/index.html
+          ls -la _site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

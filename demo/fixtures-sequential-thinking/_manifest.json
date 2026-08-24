@@ -1,0 +1,10 @@
+{
+  "schema_version": 4,
+  "created_at": "2026-08-24T18:16:44.087632+00:00",
+  "fixtures": [
+    "0001__sequentialthinking__db7c8252.json"
+  ],
+  "fixtures_sha256": "f276c898b6a0ef6833f2e456c61cae0a24f926ecf151e88b97160d9dba332f02",
+  "skipped_destructive": [],
+  "skipped_synthesis": []
+}

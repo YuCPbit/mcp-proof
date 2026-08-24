@@ -1,0 +1,35 @@
+{
+  "schema_version": 4,
+  "tool": "add_observations",
+  "case": "golden",
+  "args": {
+    "observations": [
+      {
+        "entityName": "example",
+        "contents": [
+          "example"
+        ]
+      }
+    ]
+  },
+  "response": {
+    "is_error": true,
+    "content": [
+      {
+        "type": "text",
+        "text": "Entity with name example not found"
+      }
+    ],
+    "structured": null
+  },
+  "contract_sha256": "3ab7c8f1212253bbcb00d99142eb4983a0f80440584528ca95660307bd9854ab",
+  "observation": {
+    "latency_ms": 4,
+    "recorded_at": "2026-08-24T18:15:46.792279+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-memory"
+    ]
+  }
+}

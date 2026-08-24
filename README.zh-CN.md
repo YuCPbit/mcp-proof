@@ -16,7 +16,9 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-<img src="demo/report-filesystem.png" width="760" alt="mcp-proof 对官方 MCP filesystem 服务器的交付报告——SHIP-READY，11/11 MUST 检查通过，完整 MSSS 合规表，34/34 回归全清">
+<a href="https://yucpbit.github.io/mcp-proof/report-filesystem.html"><img src="demo/report-filesystem.png" width="760" alt="mcp-proof 对官方 MCP filesystem 服务器的交付报告——SHIP-READY，11/11 MUST 检查通过，完整 MSSS 合规表，34/34 回归全清"></a>
+
+**[在线浏览全部审计报告 →](https://yucpbit.github.io/mcp-proof/)**
 
 *对官方 MCP filesystem 服务器的真实审计：27 项协议检查、MSSS 合规表、34 个回归重放——SHIP-READY，附 1 条建议级发现。*
 
@@ -85,10 +87,13 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 | 审计对象 | 判定 | 报告 |
 |---|---|---|
-| **官方 MCP filesystem 服务器**（`@modelcontextprotocol/server-filesystem`） | ✅ SHIP-READY —— 11/11 MUST 检查通过，34/34 回归全清，4 个写型工具自动跳过 | [HTML](demo/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
-| **2026-07-28 现代时代服务器**（零依赖，与官方 v2 SDK 交叉互验） | ✅ SHIP-READY —— `server/discover` 自动识别时代，23/23 MUST 含负向探测，2/2 回归全清 | [HTML](demo/report-modern.html) |
-| 埋了 **9 处违规**的演示服务器 | ❌ NOT SHIP-READY —— 5 项 MUST 失败 + 3 项安全发现，逐一带证据抓出 | [HTML](demo/report-bad.html) |
-| 行为规范的演示服务器 | ✅ SHIP-READY —— 18/18 MUST，三车道全过，含回归基线 | [HTML](demo/report-good.html) |
+| **官方 MCP filesystem 服务器**（`@modelcontextprotocol/server-filesystem`） | ✅ SHIP-READY —— 11/11 MUST 检查通过，34/34 回归全清，4 个写型工具自动跳过 | [在线报告](https://yucpbit.github.io/mcp-proof/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
+| **官方 "everything" 参考服务器**（`@modelcontextprotocol/server-everything`） | ✅ SHIP-READY —— 20/20 MUST + 7/7 SHOULD，13 个工具 0 安全发现。仅协议 + 安全两车道；刻意不录制基线——它的 `get-env` 工具会输出全部环境变量 | [在线报告](https://yucpbit.github.io/mcp-proof/report-everything.html) |
+| **官方 memory 服务器**（`@modelcontextprotocol/server-memory`） | ✅ SHIP-READY —— 16/16 MUST，4/4 回归全清，5 个写/删工具自动跳过，1 条咨询级发现：`search_nodes.query` 无输入约束（SEC-04） | [在线报告](https://yucpbit.github.io/mcp-proof/report-memory.html) |
+| **官方 sequential-thinking 服务器**（`@modelcontextprotocol/server-sequential-thinking`） | ✅ SHIP-READY —— 11/11 MUST，1/1 回归全清；抓到声明 inputSchema 漏列运行时必填字段（TOOL-08）与 2781 字符超长工具描述（SEC-05 咨询级） | [在线报告](https://yucpbit.github.io/mcp-proof/report-sequential-thinking.html) |
+| **2026-07-28 现代时代服务器**（零依赖，与官方 v2 SDK 交叉互验） | ✅ SHIP-READY —— `server/discover` 自动识别时代，23/23 MUST 含负向探测，2/2 回归全清 | [在线报告](https://yucpbit.github.io/mcp-proof/report-modern.html) |
+| 埋了 **9 处违规**的演示服务器 | ❌ NOT SHIP-READY —— 5 项 MUST 失败 + 3 项安全发现，逐一带证据抓出 | [在线报告](https://yucpbit.github.io/mcp-proof/report-bad.html) |
+| 行为规范的演示服务器 | ✅ SHIP-READY —— 18/18 MUST，三车道全过，含回归基线 | [在线报告](https://yucpbit.github.io/mcp-proof/report-good.html) |
 
 ## 🧭 与官方 conformance 套件的关系
 

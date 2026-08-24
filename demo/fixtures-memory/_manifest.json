@@ -1,0 +1,19 @@
+{
+  "schema_version": 4,
+  "created_at": "2026-08-24T18:15:46.813775+00:00",
+  "fixtures": [
+    "0001__add_observations__8643bb3c.json",
+    "0002__read_graph__44136fa3.json",
+    "0003__search_nodes__38e762cf.json",
+    "0004__open_nodes__179d490f.json"
+  ],
+  "fixtures_sha256": "0f403be6a740a840b5aeb8787f6d378500856183a7965a318d98be4ab2d0b1f5",
+  "skipped_destructive": [
+    "create_entities",
+    "create_relations",
+    "delete_entities",
+    "delete_observations",
+    "delete_relations"
+  ],
+  "skipped_synthesis": []
+}

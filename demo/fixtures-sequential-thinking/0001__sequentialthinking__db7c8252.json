@@ -1,0 +1,30 @@
+{
+  "schema_version": 4,
+  "tool": "sequentialthinking",
+  "case": "golden",
+  "args": {
+    "thought": "example",
+    "thoughtNumber": 2,
+    "totalThoughts": 2
+  },
+  "response": {
+    "is_error": true,
+    "content": [
+      {
+        "type": "text",
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool sequentialthinking: Invalid input: expected boolean, received undefined at nextThoughtNeeded"
+      }
+    ],
+    "structured": null
+  },
+  "contract_sha256": "c5f5ebb08cadb2035066be5c5287873b4010a4f4cbd5bf9dc55b0dcc60e4b1cf",
+  "observation": {
+    "latency_ms": 2,
+    "recorded_at": "2026-08-24T18:16:44.074861+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-sequential-thinking"
+    ]
+  }
+}

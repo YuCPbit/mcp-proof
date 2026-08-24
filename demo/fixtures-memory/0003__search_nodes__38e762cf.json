@@ -1,0 +1,31 @@
+{
+  "schema_version": 4,
+  "tool": "search_nodes",
+  "case": "golden",
+  "args": {
+    "query": "example"
+  },
+  "response": {
+    "is_error": false,
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"entities\": [],\n  \"relations\": []\n}"
+      }
+    ],
+    "structured": {
+      "entities": [],
+      "relations": []
+    }
+  },
+  "contract_sha256": "54e441fc0898586bc474e6fb01a7fd4dc1f25bede20f4c0d30d1c14bf7e62968",
+  "observation": {
+    "latency_ms": 3,
+    "recorded_at": "2026-08-24T18:15:46.799414+00:00",
+    "server_cmd": [
+      "npx",
+      "-y",
+      "@modelcontextprotocol/server-memory"
+    ]
+  }
+}

@@ -16,7 +16,9 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-<img src="demo/report-filesystem.png" width="760" alt="mcp-proof delivery report for the official MCP filesystem server — SHIP-READY, 11/11 MUST checks, full MSSS compliance table, 34/34 replays clean">
+<a href="https://yucpbit.github.io/mcp-proof/report-filesystem.html"><img src="demo/report-filesystem.png" width="760" alt="mcp-proof delivery report for the official MCP filesystem server — SHIP-READY, 11/11 MUST checks, full MSSS compliance table, 34/34 replays clean"></a>
+
+**[Browse the live reports →](https://yucpbit.github.io/mcp-proof/)**
 
 *A real audit of the official MCP filesystem server: 27 conformance checks, the MSSS compliance table, 34 regression replays — ship-ready, one advisory finding.*
 
@@ -85,10 +87,13 @@ An audit tool has to earn more trust than the thing it audits. What stands behin
 
 | Target | Verdict | Report |
 |---|---|---|
-| **Official MCP filesystem server** (`@modelcontextprotocol/server-filesystem`) | ✅ SHIP-READY — 11/11 MUST checks, 34/34 replays clean, 4 write tools auto-skipped | [HTML](demo/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
-| **2026-07-28 modern-era server** (zero-dep, cross-validated against the official v2 SDK) | ✅ SHIP-READY — era auto-detected via `server/discover`, 23/23 MUST incl. negative probes, 2/2 replays | [HTML](demo/report-modern.html) |
-| Demo server with **9 planted violations** | ❌ NOT SHIP-READY — 5 MUST failures + 3 security findings, every one caught with evidence | [HTML](demo/report-bad.html) |
-| Well-behaved demo server | ✅ SHIP-READY — 18/18 MUST, full three-lane pass incl. regression baseline | [HTML](demo/report-good.html) |
+| **Official MCP filesystem server** (`@modelcontextprotocol/server-filesystem`) | ✅ SHIP-READY — 11/11 MUST checks, 34/34 replays clean, 4 write tools auto-skipped | [Live report](https://yucpbit.github.io/mcp-proof/report-filesystem.html) · [PDF](demo/report-filesystem.pdf) |
+| **Official "everything" reference server** (`@modelcontextprotocol/server-everything`) | ✅ SHIP-READY — 20/20 MUST + 7/7 SHOULD, 0 security findings across 13 tools. Protocol + security lanes; recording deliberately skipped — its `get-env` tool dumps environment variables | [Live report](https://yucpbit.github.io/mcp-proof/report-everything.html) |
+| **Official memory server** (`@modelcontextprotocol/server-memory`) | ✅ SHIP-READY — 16/16 MUST, 4/4 replays clean, 5 write/delete tools auto-skipped, one advisory: unconstrained `search_nodes.query` (SEC-04) | [Live report](https://yucpbit.github.io/mcp-proof/report-memory.html) |
+| **Official sequential-thinking server** (`@modelcontextprotocol/server-sequential-thinking`) | ✅ SHIP-READY — 11/11 MUST, 1/1 replays clean; caught the advertised inputSchema omitting a runtime-required field (TOOL-08) and a 2,781-char tool description (SEC-05 advisory) | [Live report](https://yucpbit.github.io/mcp-proof/report-sequential-thinking.html) |
+| **2026-07-28 modern-era server** (zero-dep, cross-validated against the official v2 SDK) | ✅ SHIP-READY — era auto-detected via `server/discover`, 23/23 MUST incl. negative probes, 2/2 replays | [Live report](https://yucpbit.github.io/mcp-proof/report-modern.html) |
+| Demo server with **9 planted violations** | ❌ NOT SHIP-READY — 5 MUST failures + 3 security findings, every one caught with evidence | [Live report](https://yucpbit.github.io/mcp-proof/report-bad.html) |
+| Well-behaved demo server | ✅ SHIP-READY — 18/18 MUST, full three-lane pass incl. regression baseline | [Live report](https://yucpbit.github.io/mcp-proof/report-good.html) |
 
 ## 🧭 How this relates to the official conformance suite
 
