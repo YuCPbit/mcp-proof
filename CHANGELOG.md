@@ -1,5 +1,87 @@
 # Changelog
 
+## 0.8.0 — 2026-09-22
+
+Effect-aware conformance: v0.1–v0.7 proved a server's *responses* honour its
+declared contract; v0.8 extends the same declared-vs-observed methodology one
+level deeper — to what a tool call changes *outside* its response payload. This
+is a research lane (it needs an observation channel; it is not a black-box
+addition to `run`), kept in an isolated `effects/` layer that leaves the
+deterministic delivery report, its schema and its fingerprints untouched.
+Full methodology, experiments and limitations: `docs/effect-aware-conformance.md`.
+
+- **Effect layer** (`src/mcpproof/effects/`): an out-of-band `Observer` diffs
+  external state (SQLite store or jailed directory) into create/update/delete
+  effects — read from the store, never from the tool's response, so a hidden
+  effect is seen whether or not the tool narrates it. A `Probe` *exercises* a
+  created object to decide whether it is authority-bearing (usable to authorize
+  a later action), rather than guessing from persistence or a field name. Every
+  `EffectRecord` field carries **how it is known** (declared/observed/probed/
+  unknown); with no probe, authority/effectiveness stay `unknown` and their
+  checks SKIP — absence of evidence is never a silent pass. The three lineage
+  fields stay distinct: `created_via` (which call created it, observed),
+  `authorized_by` (the grant it ran under, declared), and `depends_on` (what its
+  continued effectiveness needs, established by *differential probing* — revoke
+  a candidate, re-exercise, keep only what actually disables it).
+- **Effect checks** (`checks/effects.py`): EFF-01 readOnly honoured, EFF-02
+  destructive declared, EFF-03 idempotent honoured, EFF-06 no residual authority
+  (a created object still depends on its authorizing grant) — same
+  PASS/FAIL/WARN/SKIP vocabulary as every lane.
+- **Trust correction.** `classify_tool` no longer lets an unverified
+  `readOnlyHint` claim *rescue* a heuristically-mutating tool into being
+  auto-called against a live server. MCP annotations may now only ADD caution
+  (`destructiveHint` still forces SKIP), matching the spec's normative
+  "annotations are untrusted" stance — auto-calling a tool on its own
+  "read-only" word is precisely the risk the effect lane measures. Two v0.4
+  tests updated to pin the new policy; all other behaviour unchanged.
+- **`mcp-proof effects`**: a new command that audits a SQLite-backed server's
+  effects out-of-band and renders an effect-evidence report (declared beside
+  observed, the response a response-only auditor would read, the objects that
+  resulted, and where authority was probed). Exit 1 on an effect-conformance
+  failure, 0 otherwise.
+- **Controlled testbed** (`testbed/`): a deterministic SaaS-like MCP server over
+  SQLite with authority-bearing objects (API keys, webhooks, share links),
+  lifecycle operations, a one-bit grant, and controlled mutation variants that
+  plant one inconsistency at a time. Ground truth is out-of-band (direct SQLite
+  reads + by-construction labels) — independent of the audited MCP surface.
+- **Reproducible experiments** (`experiments/`): `run_all.py` runs three
+  experiments from a clean state and renders `results/index.html` (figures +
+  tables) from the runners' own JSON. E1 (declared vs observed effect):
+  effect-aware detection reaches precision/recall 1.0 where response-only and
+  name baselines reach 0.33 recall, catching three response-invisible lies
+  neither baseline can see. E2 (persistence ≠ authority): probe accuracy 1.0 vs
+  0.88 (name) / 0.63 (persistence), correct on a decoy note named
+  `api_key_backup` and on a non-persistent credential. E3 (existence ≠
+  effectiveness): probe accuracy 1.0 with zero residual-authority missed, vs a
+  delegation-centric view that calls a key dead when its grant is revoked though
+  the key still works.
+- **11 new tests** (`tests/test_effects.py`), unit + adversarial: out-of-band
+  observation catches a response-invisible lie a response view cannot,
+  persistence ≠ authority, residual authority via differential probing, the
+  no-probe→unknown→SKIP discipline, the trust inversion, and determinism. 151
+  total. Existing 140 unchanged and green.
+- **Evaluation site redesigned as a research console**
+  (`experiments/results_page.py`, replacing the grouped-bar page): every number
+  is read from the runners' own JSON; E1's bar chart became a metric matrix
+  (inline micro-bars for recall/F1) plus a per-lie detection dot-matrix grouped
+  by response visibility; E2/E3 evidence tables use semantic ● true / ○ false
+  cells, monospace object identifiers (click to copy), light-red tint on every
+  prediction that disagrees with ground truth, and highlighted counterexample
+  rows (the `api_key_backup` decoy; the `grant_revoked` residual-authority
+  scenario). Raw evidence sits in collapsible "Inspect evidence" sections;
+  sticky experiment navigation; responsive at desktop/tablet/mobile widths.
+  The obsolete SVG bar-chart module was removed. The per-audit effect-evidence
+  report (`effects/report.py`) shares the same design tokens.
+- **GitHub Pages now publishes the evaluation** under `/evaluation/` (results
+  page, both effect-evidence reports, raw JSON/markdown), linked from the demo
+  hub and the README.
+- **README rewritten for scannability and translated**: the six long
+  "under the hood" paragraphs became short bullets, stale numbers corrected
+  (151 tests, four lanes, `@v0.8.0` action ref), and the page now ships in
+  five languages — English, 简体中文, 日本語, 한국어, Français — with a
+  switcher on every copy. New `experiments/README.md` documents the
+  reproduction pipeline.
+
 ## 0.7.2 — 2026-08-22
 
 Truthfulness patch: v0.7.1 taught the auditor to say "I don't know"; v0.7.2
