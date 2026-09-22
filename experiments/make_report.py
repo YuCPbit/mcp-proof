@@ -1,4 +1,4 @@
-"""Render flagship effect-evidence reports from a full audit (observer + probe).
+"""Render sample effect-evidence reports from a full audit (observer + probe).
 
 Two reports side by side — an honest server and one with a planted
 response-invisible lie (silent-keymint: a read-only-annotated get_note that

@@ -9,7 +9,7 @@ limitations: [docs/effect-aware-conformance.md](../docs/effect-aware-conformance
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"   # once, from the repo root
 .venv/bin/python experiments/run_all.py       # E1–E3 from a clean state → results/
-.venv/bin/python experiments/make_report.py   # flagship effect-evidence reports
+.venv/bin/python experiments/make_report.py   # per-call effect-evidence reports (honest + silent-keymint)
 ```
 
 `run_all.py` re-runs all three experiments against fresh testbed instances, writes
