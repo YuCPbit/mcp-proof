@@ -128,6 +128,30 @@ def main(argv: list[str] | None = None) -> int:
     )
     ver_p.add_argument("report", help="Report model JSON (from `mcp-proof run --json ...`)")
 
+    eff_p = sub.add_parser(
+        "effects",
+        help="Effect-aware conformance: declared MCP annotations vs external state "
+             "changes observed out-of-band (research lane; needs an observation channel)",
+    )
+    eff_p.add_argument("server_cmd", nargs="*", help="Command that starts the server (stdio)")
+    eff_p.add_argument("--url", default=None, help="Audit a running Streamable-HTTP server instead")
+    eff_p.add_argument(
+        "--sqlite", required=True,
+        help="Path to the server's SQLite state store, read out-of-band to observe effects. "
+             "The observation channel is the point: effects are read from the store, never "
+             "from the tools' responses.",
+    )
+    eff_p.add_argument("--era", choices=["auto", "modern", "legacy"], default="auto")
+    eff_p.add_argument("--out", default="mcp-proof-effects.html", help="Effect report output path")
+    eff_p.add_argument("--json", default=None, help="Also write the effect records + checks as JSON")
+    eff_p.add_argument(
+        "--include-destructive", action="store_true",
+        help="Also call write/create/delete-style tools (needed to observe their effects; "
+             "default calls only heuristically-safe tools — the same conservative policy as record)",
+    )
+    eff_p.add_argument(
+        "--server-name", default=None, help="Display name for the report")
+
     args = parser.parse_args(argv)
     if args.command not in ("diff", "verify") and bool(args.server_cmd) == bool(args.url):
         parser.error("provide either a server command (stdio) or --url (HTTP), not both/neither")

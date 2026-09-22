@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "${{ matrix.python }}"
       - run: pip install -e ".[dev]"
-      - run: ruff check src tests demo templates
+      - run: ruff check src tests demo templates testbed experiments
       # -ra prints every skip reason: a green run must mean the suite ran,
       # and test_http fails (not skips) in CI when its server can't boot
       - run: python -m pytest -q -ra

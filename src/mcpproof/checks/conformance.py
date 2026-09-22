@@ -1056,7 +1056,9 @@ async def _output_schema_dynamic_check(probe, tools: list) -> CheckResult:
     Split from TOOL-06 so unobserved never masquerades as verified: when no
     declaring tool can be safely called with schema-valid arguments, the
     verdict is SKIP with the reason, not a PASS that quietly means
-    "unverified". Annotations outrank the name heuristic (classify_tool).
+    "unverified". Call-safety comes from classify_tool, whose v0.8 policy
+    trusts annotations only to add caution — a readOnlyHint claim never makes
+    a heuristically-mutating tool eligible to be auto-called here.
     """
     from ..regression.recorder import classify_tool
     from ..regression.sampler import synthesize_valid_args

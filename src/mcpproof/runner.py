@@ -337,6 +337,93 @@ async def _cmd_verify(args) -> int:
     return 1
 
 
+async def _cmd_effects(args) -> int:
+    """Effect-aware conformance lane (research instrument).
+
+    Drives a plan of heuristically-safe tool calls, observing external state
+    out-of-band through the SQLite store the operator points at, and reports
+    declared-vs-observed effect conformance. Authority/effectiveness (EFF-06)
+    needs an environment-specific probe and stays SKIP here (a NullProbe) —
+    the probe-backed analysis runs in experiments/ against the testbed.
+    """
+    import json as _json
+
+    from .checks.effects import run_effect_checks
+    from .effects.audit import run_effect_audit
+    from .effects.model import records_to_dicts
+    from .effects.observe import SqliteObserver
+    from .effects.probes import NullProbe
+    from .effects.report import render_effect_report
+    from .regression.recorder import _session_ctx, classify_tool, list_all_tools
+    from .regression.sampler import synthesize_valid_args
+
+    cmd = args.server_cmd or None
+    url = getattr(args, "url", None)
+    observer = SqliteObserver(args.sqlite)
+
+    async with await _session_ctx(cmd, url, getattr(args, "era", "auto")) as session:
+        tools = await list_all_tools(session)
+        declared: dict[str, dict] = {}
+        plan: list[tuple[str, dict]] = []
+        skipped: list[str] = []
+        for t in tools:
+            ann = getattr(t, "annotations", None)
+            declared[t.name] = _annotations_dict(ann)
+            decision, _reason = classify_tool(t.name, t.description, ann)
+            if decision == "skip" and not args.include_destructive:
+                skipped.append(t.name)
+                continue
+            call_args, reason = synthesize_valid_args(t.inputSchema or {})
+            if call_args is None:
+                skipped.append(f"{t.name} (no synthesizable args: {reason})")
+                continue
+            plan.append((t.name, call_args))
+        records = await run_effect_audit(
+            session, plan, observer, declared=declared, probe=NullProbe(),
+        )
+
+    checks = run_effect_checks(records)
+    server_name = args.server_name or (Path(cmd[-1]).stem if cmd else url)
+    html = render_effect_report(
+        server_name, records, checks,
+        observer_desc=f"an out-of-band SQLite read of {args.sqlite}",
+        probe_desc="no probe configured (authority/effectiveness → SKIP; run the "
+                   "experiments for probe-backed analysis)",
+    )
+    Path(args.out).write_text(html, encoding="utf-8")
+    if getattr(args, "json", None):
+        Path(args.json).write_text(
+            _json.dumps({"records": records_to_dicts(records),
+                         "checks": [_check_dict(c) for c in checks]}, indent=2) + "\n",
+            encoding="utf-8")
+        print(f"✓ JSON written: {args.json}")
+    fails = [c for c in checks if c.status == FAIL]
+    print(f"✓ effect report written: {args.out}")
+    print(f"  calls observed: {len(records)} | effect-conformance failures: {len(fails)}"
+          + (f" | {len(skipped)} tool(s) not called (use --include-destructive)" if skipped else ""))
+    for c in fails:
+        print(f"  ✗ {c.id}: {c.evidence}")
+    return 1 if fails else 0
+
+
+def _annotations_dict(ann) -> dict:
+    if ann is None:
+        return {}
+    if isinstance(ann, dict):
+        return {k: v for k, v in ann.items() if v is not None}
+    out = {}
+    for key in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"):
+        v = getattr(ann, key, None)
+        if v is not None:
+            out[key] = v
+    return out
+
+
+def _check_dict(c) -> dict:
+    return {"id": c.id, "title": c.title, "level": c.level, "status": c.status,
+            "evidence": c.evidence, "fix_hint": c.fix_hint}
+
+
 async def _cmd_replay(args) -> int:
     from .regression.replayer import replay, summarize
 
@@ -373,7 +460,7 @@ def dispatch(args) -> int:
     handler = {
         "run": _cmd_run, "record": _cmd_record, "replay": _cmd_replay,
         "plan": _cmd_plan, "inspect": _cmd_inspect, "diff": _cmd_diff,
-        "verify": _cmd_verify,
+        "verify": _cmd_verify, "effects": _cmd_effects,
     }[args.command]
     try:
         return asyncio.run(handler(args))

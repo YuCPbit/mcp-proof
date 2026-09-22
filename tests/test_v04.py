@@ -63,17 +63,25 @@ async def test_tools_only_server_skips_surface_checks(good_server_cmd):
 # --------------------------------------------------- annotations-first plan ----
 
 
-def test_classify_tool_annotations_outrank_heuristic():
-    # regex would block this read-only tool; the annotation rescues it
-    assert classify_tool("run_query", "Runs a read-only query.",
-                         {"readOnlyHint": True}) == ("auto", "annotation: readOnlyHint=true")
-    # regex would miss this mutator; the annotation catches it
+def test_classify_tool_annotations_only_add_caution():
+    # v0.8 trust inversion: readOnlyHint no longer RESCUES a heuristically
+    # mutating tool — an unverified read-only claim is treated conservatively
+    # (auto-calling a 'read-only' tool against production on its own word is
+    # exactly the risk the effect lane measures). "run_query" trips the regex.
+    decision, reason = classify_tool("run_query", "Runs a read-only query.",
+                                     {"readOnlyHint": True})
+    assert decision == "skip"
+    assert "unverified" in reason
+    # destructiveHint still adds caution (annotations may only tighten)
     assert classify_tool("charge_customer", "Charge a card.",
                          {"destructiveHint": True})[0] == "skip"
     # unannotated falls back to the heuristic, both ways
     assert classify_tool("charge_customer", "Charge a card.")[0] == "auto"  # known regex gap
     assert classify_tool("delete_file", "Delete a file.")[0] == "skip"
     assert classify_tool("search_docs", "Search documentation.")[0] == "auto"
+    # a read-only claim on a heuristically-safe tool changes nothing
+    assert classify_tool("price", "Quote a price.", {"readOnlyHint": True}) == (
+        "auto", "heuristic: no mutation signal")
 
 
 def test_cli_plan_shows_basis(tmp_path):
@@ -82,9 +90,11 @@ def test_cli_plan_shows_basis(tmp_path):
         cwd=ROOT, capture_output=True, text=True, timeout=60,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+    # both echo and price are heuristically safe; price's readOnlyHint is no
+    # longer needed or used to reach auto (v0.8 trust inversion)
     assert "AUTO-CALL (2)" in proc.stdout
-    assert "annotation: readOnlyHint=true" in proc.stdout  # price
-    assert "heuristic: no mutation signal" in proc.stdout  # echo
+    assert "heuristic: no mutation signal" in proc.stdout  # echo and price
+    assert "annotation: readOnlyHint=true" not in proc.stdout
     assert "SKIPPED (0)" in proc.stdout
 
 

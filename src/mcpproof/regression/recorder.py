@@ -62,16 +62,26 @@ SKIP = "skip"
 def classify_tool(name: str, description: str | None = None, annotations=None) -> tuple[str, str]:
     """('auto'|'skip', reason) — is this tool safe to call automatically?
 
-    MCP tool annotations outrank the name/description heuristic in both
-    directions: readOnlyHint rescues read-only tools the regex over-blocks
-    (run_query, create_preview), destructiveHint catches mutators it misses
-    (charge_customer). Unannotated tools fall back to the heuristic.
+    Trust model (v0.8): MCP annotations may only add caution, never remove it.
+    The spec says clients MUST treat annotations as untrusted, and this project
+    measures rather than trusts them — so ``destructiveHint=true`` forces SKIP,
+    but ``readOnlyHint=true`` no longer *rescues* a heuristically-mutating tool
+    into auto-call. Auto-calling a tool labelled read-only against a production
+    server, on the tool's own unverified word, is exactly the risk the effect
+    lane exists to catch (a read-only-annotated tool can still mint an API key).
+    A read-only claim on a heuristically-safe tool changes nothing; on a
+    heuristically-mutating one it is recorded as an unverified claim and the
+    tool is still skipped.
+
+    Earlier versions let readOnlyHint outrank the heuristic in both directions;
+    that trust was withdrawn in v0.8 — see checks/effects.py and the EFF lane.
     """
-    if _ann(annotations, "readOnlyHint") is True:
-        return AUTO, "annotation: readOnlyHint=true"
     if _ann(annotations, "destructiveHint") is True:
         return SKIP, "annotation: destructiveHint=true"
     if is_destructive(name, description):
+        if _ann(annotations, "readOnlyHint") is True:
+            return SKIP, ("heuristic: mutating-looking name; readOnlyHint claimed "
+                          "but unverified — treated conservatively")
         return SKIP, "heuristic: mutating-looking name/description"
     return AUTO, "heuristic: no mutation signal"
 

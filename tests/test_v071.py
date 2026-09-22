@@ -197,6 +197,8 @@ def test_verify_rejects_non_reports(tmp_path):
 
 
 def test_version_flag():
+    from mcpproof import __version__
+
     proc = run_cli("--version")
     assert proc.returncode == 0
-    assert "mcp-proof 0.7" in proc.stdout
+    assert f"mcp-proof {__version__}" in proc.stdout
