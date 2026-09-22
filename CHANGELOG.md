@@ -1,5 +1,82 @@
 # Changelog
 
+## 0.8.1 — 2026-09-22
+
+Research hardening for the effect lane: external validity, spec-exact claim
+semantics, and CI-enforced reproducibility. No new research scope — the lane
+still stops at measurement, observation and evidence acquisition.
+
+- **Three third-party case studies with committed evidence**
+  (`experiments/case_studies.py`, rendered on the evaluation site and in three
+  standalone effect-evidence reports). The same audit that runs against the
+  testbed ran against published servers we did not build, at pinned versions:
+  the official memory server (JSONL store, observed through a ~20-line
+  `TableStateObserver` adapter), the official filesystem server (jailed
+  directory, stock `FilesystemObserver`, zero adapter) and the community
+  ExecuteAutomation database-server (SQLite, stock `SqliteObserver` — the
+  `--sqlite` CLI channel, zero adapter). Both official servers ship full
+  annotation sets, and every checkable declaration held under out-of-band
+  observation — readOnly tools wrote nothing, observed deletes were declared
+  destructive, and idempotency claims held under an actual repeated call. The
+  community server declares nothing (the ecosystem's common case): EFF-01/03
+  SKIP rather than inventing a verdict, and its observed DELETE is consistent
+  with the spec default. All three ran with a NullProbe — no exercisable
+  credential exists in these services — so authority stayed honestly `unknown`
+  and EFF-06 SKIPped: the case studies validate the observation half; probe
+  results remain testbed-validated (documented in §6 of the methodology doc,
+  with candidate-selection criteria and exclusions).
+- **The filesystem case study found and fixed an instrument gap.** EFF-02's
+  first implementation read only a record's headline effect type, where
+  `create` outranks `delete` — so `move_file` (create at destination + delete
+  at source in one call) escaped the delete check entirely; a lying tool could
+  have masked any delete by also creating something. `TargetRef` now carries a
+  per-object op, EFF-02 reads per-target deletes, and a regression test pins
+  the exact shape. Found by running against a real server, not by the testbed.
+- **Effect checks now follow the spec's annotation-default semantics exactly.**
+  The spec's defaults are pessimistic — an UNSET `destructiveHint` means
+  "assume destructive" — so the absence of a hint was never a contradiction,
+  and treating it as one misread the spec. EFF-02 now fails only on an
+  explicit `destructiveHint: false` falsified by an observed delete; an unset
+  hint is reported as consistent-by-default. EFF-02/03 are also scoped, as the
+  spec scopes the hints themselves, to tools not declaring
+  `readOnlyHint: true` (a readOnly tool that writes is exactly one finding —
+  EFF-01 — never two). The testbed's `hide-destructive` mutation now plants
+  the spec-correct lie (an explicit `false` claim on a deleting tool, not a
+  dropped hint), and the E1 detectors mirror the same semantics. All E1–E3
+  numbers are unchanged.
+- **`mcp-proof effects --fs-root DIR`**: the filesystem observation channel is
+  now a first-class CLI option (exactly one of `--sqlite`/`--fs-root` is
+  required). `FilesystemObserver` also records directories as objects, so
+  creating an empty directory is an observable effect; previously the observer
+  existed but was unreachable and untested. `open_session` gained an optional
+  `env` for servers configured by environment variable.
+- **CI now enforces the reproducibility claim**: a new `experiments` job
+  re-runs the full E1–E3 pipeline (now including the flagship effect-evidence
+  reports, folded into `run_all.py`) in a fresh environment and fails unless
+  every file under `experiments/results/` is byte-identical to what is
+  committed. Case studies are excluded (they need the third-party servers);
+  the page is still re-rendered from their committed JSON, so builder drift is
+  caught.
+- **Docs recalibrated, in both directions.** The README leads with the one-line
+  research claim (conformance extended below the response boundary), labels the
+  experiments by what they establish — E1 detection, E2 construct validation,
+  E3 lifecycle measurement — and adds the case studies to the real-audits
+  table. The methodology doc gains the external-validity section (§6) and a
+  related-work refresh against September 2026 (ResidualAuth 2609.08062,
+  root-scoped quiescence 2609.21284 as concurrent, agent-memory revocation
+  2609.08258, delegation-gap analysis 2609.00267, AegisMCP; the Tool
+  Annotations Interest Group's open runtime-evaluation question, cited to the
+  official blog). The contribution boundary stays: dynamic, black-box,
+  probe-verified effect conformance below the response boundary + authority-
+  by-exercise + current-effectiveness probing + the explicit
+  `created_via`/`authorized_by`/`depends_on` separation.
+- **9 new tests** (160 total): spec-default EFF-02 semantics (explicit false vs
+  unset vs readOnly-scoped), per-target delete detection (the move_file shape),
+  EFF-03 scoping, filesystem observer (files, directories, content-hash no-op,
+  move as create+delete), the JSONL graph snapshot, the `hide-destructive`
+  explicit-false lie end-to-end, and three `effects` CLI tests covering both
+  observation channels and the exactly-one-channel guard.
+
 ## 0.8.0 — 2026-09-22
 
 Effect-aware conformance: v0.1–v0.7 proved a server's *responses* honour its

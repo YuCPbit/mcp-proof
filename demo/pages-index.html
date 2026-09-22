@@ -95,12 +95,16 @@
 
   <h2>Research evaluation — effect-aware conformance (v0.8)</h2>
   <a class="card" href="evaluation/index.html">
-    <div class="name"><span class="badge pass">3 EXPERIMENTS</span>Declared MCP effects vs independently observed external state</div>
-    <div class="sub">E1 annotation-lie detection · E2 persistence ≠ authority · E3 existence ≠ current effectiveness (residual authority) — controlled testbed, out-of-band ground truth, exact measured values</div>
+    <div class="name"><span class="badge pass">3 EXPERIMENTS + 3 CASE STUDIES</span>Declared MCP effects vs independently observed external state</div>
+    <div class="sub">E1 annotation-lie detection · E2 persistence ≠ authority · E3 existence ≠ current effectiveness (residual authority) — controlled testbed, out-of-band ground truth, exact measured values · plus effect audits of three third-party servers</div>
   </a>
   <a class="card" href="evaluation/effect-report-silent-keymint.html">
     <div class="name"><span class="badge fail">EFF-01 FAIL</span>Effect-evidence report: <code>silent-keymint</code></div>
     <div class="sub">A <code>readOnlyHint: true</code> tool that silently mints an API key — the response looks like a normal read; the out-of-band state diff catches it</div>
+  </a>
+  <a class="card" href="evaluation/index.html#cases">
+    <div class="name"><span class="badge pass">EFF CASE STUDIES</span>Effect audits of servers we did not build</div>
+    <div class="sub">Official memory server (JSONL store) · official filesystem server (jailed directory, stock observer) · community SQLite server (zero annotations, honest SKIPs) — every checkable declaration held; evidence committed, versions pinned</div>
   </a>
 
   <p class="extras">Also: <a href="report-filesystem.pdf">filesystem report as PDF</a> ·

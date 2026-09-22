@@ -341,7 +341,8 @@ async def _cmd_effects(args) -> int:
     """Effect-aware conformance lane (research instrument).
 
     Drives a plan of heuristically-safe tool calls, observing external state
-    out-of-band through the SQLite store the operator points at, and reports
+    out-of-band through the channel the operator points at — a SQLite store
+    (--sqlite) or a directory the effects land in (--fs-root) — and reports
     declared-vs-observed effect conformance. Authority/effectiveness (EFF-06)
     needs an environment-specific probe and stays SKIP here (a NullProbe) —
     the probe-backed analysis runs in experiments/ against the testbed.
@@ -351,7 +352,7 @@ async def _cmd_effects(args) -> int:
     from .checks.effects import run_effect_checks
     from .effects.audit import run_effect_audit
     from .effects.model import records_to_dicts
-    from .effects.observe import SqliteObserver
+    from .effects.observe import FilesystemObserver, SqliteObserver
     from .effects.probes import NullProbe
     from .effects.report import render_effect_report
     from .regression.recorder import _session_ctx, classify_tool, list_all_tools
@@ -359,7 +360,12 @@ async def _cmd_effects(args) -> int:
 
     cmd = args.server_cmd or None
     url = getattr(args, "url", None)
-    observer = SqliteObserver(args.sqlite)
+    if args.sqlite:
+        observer = SqliteObserver(args.sqlite)
+        observer_desc = f"an out-of-band SQLite read of {args.sqlite}"
+    else:
+        observer = FilesystemObserver(args.fs_root)
+        observer_desc = f"an out-of-band snapshot of the directory {args.fs_root}"
 
     async with await _session_ctx(cmd, url, getattr(args, "era", "auto")) as session:
         tools = await list_all_tools(session)
@@ -386,7 +392,7 @@ async def _cmd_effects(args) -> int:
     server_name = args.server_name or (Path(cmd[-1]).stem if cmd else url)
     html = render_effect_report(
         server_name, records, checks,
-        observer_desc=f"an out-of-band SQLite read of {args.sqlite}",
+        observer_desc=observer_desc,
         probe_desc="no probe configured (authority/effectiveness → SKIP; run the "
                    "experiments for probe-backed analysis)",
     )

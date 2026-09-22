@@ -70,3 +70,63 @@ def test_next_steps_maintenance_branch_on_perfect_results(tmp_path):
                        out_path=tmp_path / "r.html")
     html = out.read_text(encoding="utf-8")
     assert "KEEP" in html and "Re-audit after the next MCP spec revision" in html
+
+
+# --------------------------------------------------- effects command (v0.8) ----
+
+
+def test_effects_cli_sqlite_channel_catches_response_invisible_lie(tmp_path):
+    """`mcp-proof effects --sqlite` end to end against the SaaS testbed with the
+    phantom-write mutation: ping is readOnly-annotated, answers "ok", and
+    writes a note — only the out-of-band channel can see it. Exit 1 + EFF-01."""
+    db = str(tmp_path / "state.db")
+    out = tmp_path / "effects.html"
+    proc = run_cli(
+        "effects", "--sqlite", db, "--out", str(out), "--",
+        PYTHON, str(ROOT / "testbed" / "saas_server.py"),
+        "--db", db, "--mutate", "phantom-write",
+    )
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert "EFF-01" in proc.stdout
+    html = out.read_text(encoding="utf-8")
+    assert "ping" in html and "out-of-band" in html
+
+
+def test_effects_cli_fs_root_channel(tmp_path):
+    """The --fs-root observation channel end to end: honest file server passes;
+    the --lie variant (readOnly read_file drops a shadow file) fails EFF-01."""
+    root = tmp_path / "jail"
+    out = tmp_path / "effects.html"
+    server = str(ROOT / "tests" / "file_target_server.py")
+    ok = run_cli(
+        "effects", "--fs-root", str(root), "--include-destructive",
+        "--out", str(out), "--json", str(tmp_path / "ok.json"), "--",
+        PYTHON, server, "--root", str(root),
+    )
+    assert ok.returncode == 0, ok.stdout + ok.stderr
+    import json as _json
+
+    records = _json.loads((tmp_path / "ok.json").read_text(encoding="utf-8"))["records"]
+    save = next(r for r in records if r["tool"] == "save_file")
+    assert save["effect_type"]["value"] == "create"          # observed, out-of-band
+    assert save["targets"][0]["op"] == "create"
+
+    root2 = tmp_path / "jail2"
+    bad = run_cli(
+        "effects", "--fs-root", str(root2), "--out", str(tmp_path / "bad.html"), "--",
+        PYTHON, server, "--root", str(root2), "--lie",
+    )
+    assert bad.returncode == 1, bad.stdout + bad.stderr
+    assert "EFF-01" in bad.stdout and "read_file" in bad.stdout
+
+
+def test_effects_cli_requires_exactly_one_channel(tmp_path):
+    neither = run_cli("effects", PYTHON, str(ROOT / "demo" / "good_server.py"))
+    assert neither.returncode == 2
+    assert "exactly one observation channel" in neither.stderr
+    both = run_cli(
+        "effects", "--sqlite", str(tmp_path / "x.db"), "--fs-root", str(tmp_path),
+        PYTHON, str(ROOT / "demo" / "good_server.py"),
+    )
+    assert both.returncode == 2
+    assert "exactly one observation channel" in both.stderr

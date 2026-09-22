@@ -144,6 +144,12 @@ tr.hl-accent .bar i{background:var(--accent)}
        padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2)}
 .badge.bad{color:var(--bad);border-color:rgba(179,53,46,.4);background:var(--bad-tint)}
 .badge.inv{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+.badge.ok{color:var(--ok);border-color:rgba(47,125,70,.4);background:rgba(47,125,70,.06)}
+.badge.warn{color:var(--warn);border-color:rgba(161,98,7,.4);background:rgba(161,98,7,.06)}
+.badge.skip{color:var(--ink-3)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.caselist{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--ink-2);max-width:60em}
+.caselist li{margin:4px 0}
 
 /* evidence disclosure */
 details.evidence{margin:16px 0 0;border:1px solid var(--line);background:var(--panel);
@@ -508,6 +514,95 @@ def e3_evidence(scenarios: list[dict]) -> str:
     return evidence_details("Inspect evidence — per-scenario probe transcript", inner)
 
 
+# ------------------------------------------------------ case-study pieces ----
+
+
+def cs_overview_table(cases: list[dict]) -> str:
+    rows = []
+    for c in cases:
+        srv = c["server"]
+        prof = c["annotations_profile"]
+        eff = c["summary"]["effects_observed"]
+        chip_cls = {"PASS": "ok", "FAIL": "bad", "WARN": "warn"}
+        chips = "".join(
+            f'<span class="badge {chip_cls.get(k["status"], "skip")}">'
+            f'{_e(k["id"])} {_e(k["status"])}</span>'
+            for k in c["checks"])
+        ann = (f'{prof["annotated"]}/{prof["tools"]} tools'
+               if prof["annotated"] else "none declared")
+        rows.append(
+            f'<tr><td><span>{copy_id(srv["package"])}</span>'
+            f'<span class="sub">{_e(srv["maintainer"])}</span></td>'
+            f'<td><span class="val">{_e(srv["store"])}</span>'
+            f'<span class="sub">{_e(c["observer"].split(" — ")[0].split(" (")[0])}</span></td>'
+            f'<td><span class="val">{ann}</span>'
+            f'<span class="sub">{prof["readonly_true"]} readOnly · '
+            f'{prof["destructive_true"]} destructive · {prof["idempotent_true"]} idempotent</span></td>'
+            f'<td><span class="val">{eff["create"]}c / {eff["update"]}u / {eff["delete"]}d</span>'
+            f'<span class="sub">over {c["summary"]["calls"]} calls</span></td>'
+            f'<td><div class="chips">{chips}</div>'
+            f'<span class="sub"><a href="effect-report-case-{_e(c["target"])}.html">'
+            f'effect-evidence report</a> · <a href="case_{_e(c["target"])}.json">raw JSON</a>'
+            f'</span></td></tr>')
+    return table(["Server (pinned)", "Store · observer", "Annotations",
+                  "Observed effects", "Effect checks"], rows)
+
+
+def cs_notes(cases: list[dict]) -> str:
+    blocks = []
+    for c in cases:
+        items = "".join(f"<li>{_e(n)}</li>" for n in c["notes"])
+        blocks.append(f'<p class="method" style="margin-top:18px"><b>'
+                      f'{_e(c["server"]["package"])}</b></p><ul class="caselist">{items}</ul>')
+    return "".join(blocks)
+
+
+def case_studies_section(cases: list[dict]) -> str:
+    if not cases:
+        return ""
+    viz = cs_overview_table(cases)
+    n = len(cases)
+    total_fails = sum(c["summary"]["failures"] for c in cases)
+    if total_fails:
+        offenders = ", ".join(
+            f'{c["server"]["package"]} ({c["summary"]["failures"]})'
+            for c in cases if c["summary"]["failures"])
+        finding_html = finding(
+            f"{total_fails} effect-conformance failure(s) across the {n} audited servers "
+            f"— {_e(offenders)}; the per-check evidence below quotes the observed state "
+            "delta behind each.")
+    else:
+        finding_html = finding(
+            f"No annotation contradiction on any of the {n} audited servers — the honest "
+            "result. The declarations that could be checked held under observation "
+            "(readOnly tools wrote nothing; deletes were declared destructive; "
+            "idempotent claims held under an actual repeat), and where nothing was "
+            "declared the checks SKIPped instead of inventing a verdict.")
+    note = method_note(
+        "<b>Scope of this validation:</b> these runs exercise the observation half of the "
+        "lane for real — out-of-band per-object effect attribution and EFF-01/02/03 against "
+        "annotations the servers themselves ship, including the honest-degradation path when "
+        "nothing is declared. None of these services mints a credential with a local "
+        "authorization rule to exercise, so every case ran with a NullProbe: authority and "
+        "effectiveness stay <span class=\"val\">unknown</span> and EFF-06 SKIPs. Probe-backed "
+        "authority/effectiveness classification (E2/E3) remains validated on the controlled "
+        "testbed only. Runs are pinned to the exact package versions shown; they need the "
+        "servers on the machine, so they are re-run by "
+        "<code class=\"val\">python experiments/case_studies.py</code>, not by the CI "
+        "reproduction gate.")
+    return experiment_section(
+        "CS", "cases", "Case studies — third-party servers",
+        f"Does the instrument work on servers we did not build? {n} published MCP servers "
+        "— official reference servers and a community server — across three store "
+        "types (JSONL file, directory tree, SQLite) and two annotation profiles "
+        "(fully annotated, none declared).",
+        finding_html,
+        viz,
+        "",
+        note + cs_notes(cases),
+    )
+
+
 # ------------------------------------------------------------- assembly ----
 
 
@@ -520,10 +615,19 @@ def _nav(items: list[tuple[str, str, str]]) -> str:
             f'{links}</nav></aside>')
 
 
-def _header(r1: dict, r2: dict, r3: dict) -> str:
+def _header(r1: dict, r2: dict, r3: dict, cases: list[dict] | None = None) -> str:
+    cases = cases or []
     n_exp = 3
     n_lies = len(r1.get("catch_table", {}))
     n_invisible = sum(1 for v in r1.get("catch_table", {}).values() if v["response_invisible"])
+    case_cell = ""
+    if cases:
+        case_cell = f"""
+  <div role="listitem"><span class="k">Case studies</span>
+    <span class="v">{len(cases)} third-party servers</span></div>"""
+    case_links = "".join(
+        f'\n  <a href="case_{_e(c["target"])}.json">case-{_e(c["target"])}.json</a>'
+        for c in cases)
     meta = f"""
 <div class="metastrip" role="list">
   <div role="listitem"><span class="k">Testbed</span>
@@ -533,18 +637,19 @@ def _header(r1: dict, r2: dict, r3: dict) -> str:
   <div role="listitem"><span class="k">Experiments</span>
     <span class="v">{n_exp} · 3 detectors each</span></div>
   <div role="listitem"><span class="k">Planted lies</span>
-    <span class="v">{n_lies} ({n_invisible} response-invisible)</span></div>
+    <span class="v">{n_lies} ({n_invisible} response-invisible)</span></div>{case_cell}
 </div>
-<p class="disclaimer">Controlled-testbed measurements of detection behaviour on planted
-inconsistencies — not production prevalence. Ground truth is read out-of-band from the state
-store, never through the audited MCP surface.</p>
+<p class="disclaimer">E1–E3 are controlled-testbed measurements of detection behaviour on
+planted inconsistencies — not production prevalence. Ground truth is read out-of-band from
+the state store, never through the audited MCP surface. The case studies run the same
+instrument against published third-party servers.</p>
 <p class="artifacts">Artifacts:
   <a href="effect-report-honest.html">effect-report-honest.html</a>
   <a href="effect-report-silent-keymint.html">effect-report-silent-keymint.html</a>
   <a href="summary.md">summary.md</a>
   <a href="e1_effect_conformance.json">e1.json</a>
   <a href="e2_persistence_vs_authority.json">e2.json</a>
-  <a href="e3_existence_vs_effectiveness.json">e3.json</a>
+  <a href="e3_existence_vs_effectiveness.json">e3.json</a>{case_links}
 </p>"""
     return f"""
 <header class="doc" id="overview" data-spy>
@@ -555,24 +660,31 @@ store, never through the audited MCP surface.</p>
   <p class="lede">Declared MCP semantics can be misleading even when tool responses and tool
   names look correct. Each experiment compares a declared or inferred property against ground
   truth established outside the audited MCP surface — an out-of-band state observer and a
-  probe that exercises created objects.</p>
+  probe that exercises created objects. E1 is the detection experiment; E2 validates that
+  the persistence/authority distinction is operationally real (construct validation); E3
+  measures effectiveness after lifecycle events (residual authority); the case studies take
+  the instrument to servers we did not build.</p>
   {meta}
 </header>"""
 
 
-def build_page(r1: dict, r2: dict, r3: dict) -> str:
-    nav = _nav([
+def build_page(r1: dict, r2: dict, r3: dict, cases: list[dict] | None = None) -> str:
+    cases = cases or []
+    nav_items = [
         ("", "Overview", "overview"),
         ("E1", "Annotation lies", "e1"),
         ("E2", "Persistence vs authority", "e2"),
         ("E3", "Effectiveness", "e3"),
-        ("", "Method", "method"),
-    ])
+    ]
+    if cases:
+        nav_items.append(("CS", "Case studies", "cases"))
+    nav_items.append(("", "Method", "method"))
+    nav = _nav(nav_items)
 
     e1 = experiment_section(
         "E1", "e1", "Declared effect vs observed effect",
-        "Can effect observation catch annotation lies that a response-only auditor and a "
-        "name heuristic miss?",
+        "The detection experiment: can effect observation catch annotation lies that a "
+        "response-only auditor and a name heuristic miss?",
         finding("Only effect observation detects all three response-invisible lies. "
                 "Each baseline reaches recall 0.333 with a structural blind spot the "
                 "observation channel cannot fix."),
@@ -589,9 +701,10 @@ def build_page(r1: dict, r2: dict, r3: dict) -> str:
 
     e2 = experiment_section(
         "E2", "e2", "Persistence is not authority",
-        "Does probe-backed classification separate authority-bearing objects from ordinary "
-        "persistent objects better than “persistent ⇒ authority” and a credential-name "
-        "keyword?",
+        "Construct validation, not a benchmark: is the persistence/authority distinction "
+        "operationally real — does probe-backed classification separate authority-bearing "
+        "objects from ordinary persistent objects where “persistent ⇒ authority” and a "
+        "credential-name keyword go wrong?",
         finding("The probe classifies by <em>use</em>, not appearance — it is correct on the "
                 "decoy note named <code>api_key_backup</code> (fools both baselines' signals) "
                 "and on a credential that never persisted."),
@@ -609,9 +722,10 @@ def build_page(r1: dict, r2: dict, r3: dict) -> str:
 
     e3 = experiment_section(
         "E3", "e3", "Existence is not current effectiveness",
-        "After a lifecycle event (grant revoked, key revoked, key deleted, TTL expired), does "
-        "an exercise probe report an object's true effectiveness where “it is still listed” "
-        "and “its grant is still active” do not?",
+        "A lifecycle measurement: after an event (grant revoked, key revoked, key deleted, "
+        "TTL expired), does an exercise probe report an object's true effectiveness where "
+        "“it is still listed” and “its grant is still active” do not — and why "
+        "authorized_by cannot be read as depends_on?",
         finding("In <code>grant_revoked</code> the key remains effective although the grant "
                 "that authorized it is gone — residual authority. The delegation-centric view "
                 "calls it dead (the one false-ineffective); the probe does not, and existence "
@@ -646,6 +760,8 @@ def build_page(r1: dict, r2: dict, r3: dict) -> str:
   <code class="val">python experiments/make_report.py</code>.</p>
 </section>"""
 
+    cs = case_studies_section(cases)
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -658,10 +774,11 @@ def build_page(r1: dict, r2: dict, r3: dict) -> str:
 <div class="shell">
 {nav}
 <main>
-{_header(r1, r2, r3)}
+{_header(r1, r2, r3, cases)}
 {e1}
 {e2}
 {e3}
+{cs}
 {method}
 <footer class="doc">
 Generated by <code>experiments/run_all.py</code> from the runners' own JSON outputs ·

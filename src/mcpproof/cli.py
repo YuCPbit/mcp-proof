@@ -136,10 +136,16 @@ def main(argv: list[str] | None = None) -> int:
     eff_p.add_argument("server_cmd", nargs="*", help="Command that starts the server (stdio)")
     eff_p.add_argument("--url", default=None, help="Audit a running Streamable-HTTP server instead")
     eff_p.add_argument(
-        "--sqlite", required=True,
+        "--sqlite", default=None,
         help="Path to the server's SQLite state store, read out-of-band to observe effects. "
              "The observation channel is the point: effects are read from the store, never "
              "from the tools' responses.",
+    )
+    eff_p.add_argument(
+        "--fs-root", default=None,
+        help="Alternative observation channel: a directory the server's effects land in "
+             "(a jail root, a data directory), snapshotted out-of-band — files by content "
+             "hash, directories as objects. Exactly one of --sqlite/--fs-root is required.",
     )
     eff_p.add_argument("--era", choices=["auto", "modern", "legacy"], default="auto")
     eff_p.add_argument("--out", default="mcp-proof-effects.html", help="Effect report output path")
@@ -155,6 +161,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command not in ("diff", "verify") and bool(args.server_cmd) == bool(args.url):
         parser.error("provide either a server command (stdio) or --url (HTTP), not both/neither")
+    if args.command == "effects" and bool(args.sqlite) == bool(args.fs_root):
+        parser.error("effects needs exactly one observation channel: --sqlite PATH or --fs-root DIR")
 
     from .runner import dispatch  # deferred: keeps --help fast
 

@@ -134,21 +134,26 @@ class SqliteObserver(Observer):
 
 class FilesystemObserver(Observer):
     """Snapshots a jailed directory: each file becomes an object keyed by its
-    path relative to the root, fingerprinted by size + content hash. Proves
-    the observer abstraction is not SQLite-specific."""
+    path relative to the root, fingerprinted by size + content hash, and each
+    directory an object of type ``dir`` (so creating an empty directory is an
+    observable effect, not a blind spot). Proves the observer abstraction is
+    not SQLite-specific."""
 
     def __init__(self, root: str | Path):
         self.root = Path(root)
 
     def snapshot(self) -> Snapshot:
-        files: dict[str, dict] = {}
+        entries: dict[str, dict] = {}
         if self.root.exists():
             for p in sorted(self.root.rglob("*")):
+                rel = str(p.relative_to(self.root)).replace("\\", "/")
                 if p.is_file():
                     data = p.read_bytes()
-                    rel = str(p.relative_to(self.root))
-                    files[rel] = {
+                    entries[rel] = {
+                        "type": "file",
                         "size": len(data),
                         "sha256": hashlib.sha256(data).hexdigest(),
                     }
-        return {"files": files}
+                elif p.is_dir():
+                    entries[rel] = {"type": "dir"}
+        return {"fs": entries}

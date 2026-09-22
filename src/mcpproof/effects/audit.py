@@ -86,6 +86,8 @@ async def run_effect_audit(
                             response_text=response_text)
         _fill_effect_type(rec, deltas)
         _fill_targets(rec, deltas)
+        if any(d.op == CREATE for d in deltas):
+            rec.created_via = call_id  # lineage: which call produced the object(s)
         if session_grant is not None and rec.effect_type.value == E_CREATE:
             rec.authorized_by = Evidenced(
                 session_grant, HOW_DECLARED,
@@ -138,7 +140,7 @@ def _fill_effect_type(rec: EffectRecord, deltas: list) -> None:
 
 
 def _fill_targets(rec: EffectRecord, deltas: list) -> None:
-    rec.targets = [TargetRef(d.store, d.key) for d in deltas]
+    rec.targets = [TargetRef(d.store, d.key, _OP_TO_EFFECT[d.op]) for d in deltas]
 
 
 def _fill_persistence(created_index: list, final) -> None:

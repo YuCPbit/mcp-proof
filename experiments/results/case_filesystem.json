@@ -1,0 +1,933 @@
+{
+  "case": "third_party_effect_audit",
+  "target": "filesystem",
+  "server": {
+    "package": "@modelcontextprotocol/server-filesystem@2026.8.31",
+    "maintainer": "modelcontextprotocol (official reference server)",
+    "command": "npx -y @modelcontextprotocol/server-filesystem@2026.8.31 <jail>",
+    "store": "jailed directory tree"
+  },
+  "observer": "the stock FilesystemObserver over the jail root — files by content hash, directories as objects; zero target-specific code",
+  "probe": "none — this service mints no credential-like object with a local authorization rule to exercise, so authority/effectiveness stay unknown and EFF-06 SKIPs (probe-backed classification remains validated on the controlled testbed, E2/E3)",
+  "annotations_profile": {
+    "tools": 14,
+    "annotated": 14,
+    "readonly_true": 10,
+    "destructive_true": 3,
+    "idempotent_true": 2
+  },
+  "plan": [
+    [
+      "create_directory",
+      {
+        "path": "<jail>/workspace"
+      }
+    ],
+    [
+      "create_directory",
+      {
+        "path": "<jail>/workspace"
+      }
+    ],
+    [
+      "write_file",
+      {
+        "path": "<jail>/workspace/a.txt",
+        "content": "alpha v1\n"
+      }
+    ],
+    [
+      "write_file",
+      {
+        "path": "<jail>/workspace/a.txt",
+        "content": "alpha v1\n"
+      }
+    ],
+    [
+      "read_file",
+      {
+        "path": "<jail>/workspace/a.txt"
+      }
+    ],
+    [
+      "read_text_file",
+      {
+        "path": "<jail>/workspace/a.txt"
+      }
+    ],
+    [
+      "read_media_file",
+      {
+        "path": "<jail>/workspace/a.txt"
+      }
+    ],
+    [
+      "read_multiple_files",
+      {
+        "paths": [
+          "<jail>/workspace/a.txt"
+        ]
+      }
+    ],
+    [
+      "get_file_info",
+      {
+        "path": "<jail>/workspace/a.txt"
+      }
+    ],
+    [
+      "list_directory",
+      {
+        "path": "<jail>"
+      }
+    ],
+    [
+      "list_directory_with_sizes",
+      {
+        "path": "<jail>"
+      }
+    ],
+    [
+      "directory_tree",
+      {
+        "path": "<jail>"
+      }
+    ],
+    [
+      "search_files",
+      {
+        "path": "<jail>",
+        "pattern": "a.txt"
+      }
+    ],
+    [
+      "list_allowed_directories",
+      {}
+    ],
+    [
+      "edit_file",
+      {
+        "path": "<jail>/workspace/a.txt",
+        "edits": [
+          {
+            "oldText": "alpha v1",
+            "newText": "alpha v2"
+          }
+        ]
+      }
+    ],
+    [
+      "move_file",
+      {
+        "source": "<jail>/workspace/a.txt",
+        "destination": "<jail>/workspace/b.txt"
+      }
+    ]
+  ],
+  "checks": [
+    {
+      "id": "EFF-01",
+      "level": "MUST",
+      "status": "PASS",
+      "evidence": "10 readOnly-annotated tool call(s) caused no observed external write"
+    },
+    {
+      "id": "EFF-02",
+      "level": "MUST",
+      "status": "PASS",
+      "evidence": "all 1 observed deleted object(s) consistent with declared/default destructive semantics: 1 call(s) from tools declaring destructiveHint=true"
+    },
+    {
+      "id": "EFF-03",
+      "level": "SHOULD",
+      "status": "PASS",
+      "evidence": "2 repeated idempotent call(s) left external state unchanged"
+    },
+    {
+      "id": "EFF-06",
+      "level": "SHOULD",
+      "status": "SKIP",
+      "evidence": "no created authority-bearing object to assess"
+    }
+  ],
+  "summary": {
+    "calls": 16,
+    "effects_observed": {
+      "create": 3,
+      "update": 1,
+      "delete": 0,
+      "none": 12
+    },
+    "checks": {
+      "EFF-01": "PASS",
+      "EFF-02": "PASS",
+      "EFF-03": "PASS",
+      "EFF-06": "SKIP"
+    },
+    "failures": 0,
+    "warnings": 0
+  },
+  "notes": [
+    "All ten readOnlyHint=true tools caused no observed filesystem change — EFF-01 verified against the server's own declarations.",
+    "move_file is observed as create(destination) + delete(source); its destructiveHint=true declaration covers the observed delete (EFF-02).",
+    "This call improved the instrument: EFF-02's first implementation read only the record's headline effect, where create outranks delete — so move_file's delete was invisible to it (a lying tool could mask a delete by also creating something). EFF-02 now reads per-target ops; the gap was found by this case study, not by the testbed.",
+    "write_file and create_directory declare idempotentHint=true; the repeated identical calls left the tree byte-identical, so the claim held under an actual repeat."
+  ],
+  "records": [
+    {
+      "call_id": "call#1:create_directory",
+      "tool": "create_directory",
+      "args": {
+        "path": "<jail>/workspace"
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Successfully created directory <jail>/workspace",
+      "effect_type": {
+        "value": "create",
+        "how": "observed",
+        "evidence": "observed 1 change(s): create fs/workspace"
+      },
+      "targets": [
+        {
+          "store": "fs",
+          "key": "workspace",
+          "op": "create"
+        }
+      ],
+      "persistence": {
+        "value": true,
+        "how": "observed",
+        "evidence": "fs/workspace present in the final snapshot"
+      },
+      "authority_bearing": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": "probe inconclusive"
+      },
+      "created_via": "call#1:create_directory",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#2:create_directory",
+      "tool": "create_directory",
+      "args": {
+        "path": "<jail>/workspace"
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Successfully created directory <jail>/workspace",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#3:write_file",
+      "tool": "write_file",
+      "args": {
+        "path": "<jail>/workspace/a.txt",
+        "content": "alpha v1\n"
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Successfully wrote to <jail>/workspace/a.txt",
+      "effect_type": {
+        "value": "create",
+        "how": "observed",
+        "evidence": "observed 1 change(s): create fs/workspace/a.txt"
+      },
+      "targets": [
+        {
+          "store": "fs",
+          "key": "workspace/a.txt",
+          "op": "create"
+        }
+      ],
+      "persistence": {
+        "value": false,
+        "how": "observed",
+        "evidence": "fs/workspace/a.txt absent from the final snapshot"
+      },
+      "authority_bearing": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": "probe inconclusive"
+      },
+      "created_via": "call#3:write_file",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#4:write_file",
+      "tool": "write_file",
+      "args": {
+        "path": "<jail>/workspace/a.txt",
+        "content": "alpha v1\n"
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Successfully wrote to <jail>/workspace/a.txt",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#5:read_file",
+      "tool": "read_file",
+      "args": {
+        "path": "<jail>/workspace/a.txt"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "alpha v1\n",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#6:read_text_file",
+      "tool": "read_text_file",
+      "args": {
+        "path": "<jail>/workspace/a.txt"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "alpha v1\n",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#7:read_media_file",
+      "tool": "read_media_file",
+      "args": {
+        "path": "<jail>/workspace/a.txt"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#8:read_multiple_files",
+      "tool": "read_multiple_files",
+      "args": {
+        "paths": [
+          "<jail>/workspace/a.txt"
+        ]
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "<jail>/workspace/a.txt:\nalpha v1\n\n",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#9:get_file_info",
+      "tool": "get_file_info",
+      "args": {
+        "path": "<jail>/workspace/a.txt"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "size: 9\ncreated: Tue Sep 22 2026 14:07:40 GMT+0800 (China Standard Time)\nmodified: Tue Sep 22 2026 14:07:40 GMT+0800 (China Standard Time)\naccessed: Tue Sep 22 2026 14:07:40 GMT+0800 (China Standard Time)\nisDirectory: false\nisFile: true\npermissions: 644",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#10:list_directory",
+      "tool": "list_directory",
+      "args": {
+        "path": "<jail>"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "[DIR] workspace",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#11:list_directory_with_sizes",
+      "tool": "list_directory_with_sizes",
+      "args": {
+        "path": "<jail>"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "[DIR] workspace                      \n\nTotal: 0 files, 1 directories\nCombined size: 0 B",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#12:directory_tree",
+      "tool": "directory_tree",
+      "args": {
+        "path": "<jail>"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "[\n  {\n    \"name\": \"workspace\",\n    \"type\": \"directory\",\n    \"children\": [\n      {\n        \"name\": \"a.txt\",\n        \"type\": \"file\"\n      }\n    ]\n  }\n]",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#13:search_files",
+      "tool": "search_files",
+      "args": {
+        "path": "<jail>",
+        "pattern": "a.txt"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "No matches found",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#14:list_allowed_directories",
+      "tool": "list_allowed_directories",
+      "args": {},
+      "declared": {
+        "readOnlyHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Allowed directories:\n<jail>\n<jail>",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#15:edit_file",
+      "tool": "edit_file",
+      "args": {
+        "path": "<jail>/workspace/a.txt",
+        "edits": [
+          {
+            "oldText": "alpha v1",
+            "newText": "alpha v2"
+          }
+        ]
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "response_text": "```diff\nIndex: <jail>/workspace/a.txt\n===================================================================\n--- <jail>/workspace/a.txt\toriginal\n+++ <jail>/workspace/a.txt\tmodified\n@@ -1,1 +1,1 @@\n-alpha v1\n+alpha v2\n```\n\n",
+      "effect_type": {
+        "value": "update",
+        "how": "observed",
+        "evidence": "observed 1 change(s): update fs/workspace/a.txt"
+      },
+      "targets": [
+        {
+          "store": "fs",
+          "key": "workspace/a.txt",
+          "op": "update"
+        }
+      ],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "call created no object to bear authority"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#16:move_file",
+      "tool": "move_file",
+      "args": {
+        "source": "<jail>/workspace/a.txt",
+        "destination": "<jail>/workspace/b.txt"
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "response_text": "Successfully moved <jail>/workspace/a.txt to <jail>/workspace/b.txt",
+      "effect_type": {
+        "value": "create",
+        "how": "observed",
+        "evidence": "observed 2 change(s): create fs/workspace/b.txt, delete fs/workspace/a.txt"
+      },
+      "targets": [
+        {
+          "store": "fs",
+          "key": "workspace/b.txt",
+          "op": "create"
+        },
+        {
+          "store": "fs",
+          "key": "workspace/a.txt",
+          "op": "delete"
+        }
+      ],
+      "persistence": {
+        "value": true,
+        "how": "observed",
+        "evidence": "fs/workspace/b.txt present in the final snapshot"
+      },
+      "authority_bearing": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": "probe inconclusive"
+      },
+      "created_via": "call#16:move_file",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    }
+  ]
+}

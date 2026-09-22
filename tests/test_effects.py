@@ -82,6 +82,69 @@ def test_eff_checks_over_handbuilt_records():
     assert {c.id: c.status for c in run_effect_checks([r2])}["EFF-02"] == PASS
 
 
+def test_eff02_follows_spec_default_semantics():
+    """The spec's default for an UNSET destructiveHint is true (pessimistic),
+    so absence is never a contradiction; only an explicit false is."""
+    def delete_rec(declared):
+        r = EffectRecord("c", "rotate_logs", {}, declared)
+        r.effect_type = Evidenced("delete", "observed", "deleted logs/old")
+        r.targets = [TargetRef("logs", "old", "delete")]
+        return r
+
+    # explicit destructiveHint=false + observed delete → the contradiction
+    fail = {c.id: c for c in run_effect_checks([delete_rec({"destructiveHint": False})])}
+    assert fail["EFF-02"].status == FAIL
+    assert "destructiveHint=false" in fail["EFF-02"].evidence
+    # unset hint + observed delete → covered by the spec default, PASS
+    ok = {c.id: c for c in run_effect_checks([delete_rec({})])}
+    assert ok["EFF-02"].status == PASS
+    assert "default" in ok["EFF-02"].evidence
+    # readOnly-declared tool that deletes: EFF-01's contradiction alone —
+    # destructiveHint is meaningless under readOnly=true, so EFF-02 SKIPs
+    ro = {c.id: c for c in run_effect_checks([delete_rec({"readOnlyHint": True})])}
+    assert ro["EFF-01"].status == FAIL
+    assert ro["EFF-02"].status == SKIP
+
+
+def test_eff02_reads_per_target_ops_not_headline():
+    """Regression pin for the filesystem case study: a call that creates one
+    object AND deletes another headlines `create` (precedence), and the first
+    EFF-02 implementation was blind to its delete. Per-target ops close that."""
+    r = EffectRecord("c1", "move_thing", {}, {"destructiveHint": False})
+    r.effect_type = Evidenced(E_CREATE, "observed",
+                              "observed 2 change(s): create fs/b, delete fs/a")
+    r.targets = [TargetRef("fs", "b", "create"), TargetRef("fs", "a", "delete")]
+    checks = {c.id: c for c in run_effect_checks([r])}
+    assert checks["EFF-02"].status == FAIL
+    assert "fs/a" in checks["EFF-02"].evidence
+    # with destructiveHint=true the same call is declared → PASS
+    r.declared = {"destructiveHint": True}
+    assert {c.id: c.status for c in run_effect_checks([r])}["EFF-02"] == PASS
+
+
+def test_eff03_scoped_to_non_readonly_tools():
+    """idempotentHint is meaningful only when readOnlyHint is false (spec): a
+    repeated readOnly+idempotent read contributes nothing to EFF-03 — its
+    writes, if any, are EFF-01's finding."""
+    def read_rec():
+        r = EffectRecord("c", "read_graph", {}, {"readOnlyHint": True, "idempotentHint": True})
+        r.effect_type = Evidenced("none", "observed", "no change")
+        return r
+
+    checks = {c.id: c for c in run_effect_checks([read_rec(), read_rec()])}
+    assert checks["EFF-03"].status == SKIP
+    # a non-readOnly idempotent tool repeated with no effect → PASS
+    def write_rec(effect):
+        r = EffectRecord("c", "upsert", {"k": 1}, {"idempotentHint": True})
+        r.effect_type = Evidenced(effect, "observed", f"{effect} s/k")
+        return r
+
+    ok = {c.id: c for c in run_effect_checks([write_rec("create"), write_rec("none")])}
+    assert ok["EFF-03"].status == PASS
+    bad = {c.id: c for c in run_effect_checks([write_rec("create"), write_rec("update")])}
+    assert bad["EFF-03"].status == FAIL
+
+
 def test_eff06_skips_without_probe():
     # a created authority object with UNKNOWN depends_on (no probe) → EFF-06 SKIP,
     # never a silent pass
@@ -103,6 +166,42 @@ def test_sqlite_observer_introspects_arbitrary_tables(tmp_path):
     conn.close()
     snap = sqlite_snapshot(db)
     assert snap["widgets"]["w1"]["v"] == 5
+
+
+def test_filesystem_observer_sees_files_and_directories(tmp_path):
+    """Files by content hash, directories as objects — so creating an empty
+    directory is an observable effect, and a move reads as create+delete."""
+    from mcpproof.effects.observe import FilesystemObserver
+
+    obs = FilesystemObserver(tmp_path)
+    before = obs.snapshot()
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "a.txt").write_text("alpha", encoding="utf-8")
+    mid = obs.snapshot()
+    ops = {(d.op, d.key) for d in obs.diff(before, mid)}
+    assert ops == {("create", "sub"), ("create", "sub/a.txt")}
+    # move = create at destination + delete at source
+    (tmp_path / "sub" / "a.txt").rename(tmp_path / "sub" / "b.txt")
+    after = obs.snapshot()
+    ops2 = {(d.op, d.key) for d in obs.diff(mid, after)}
+    assert ops2 == {("create", "sub/b.txt"), ("delete", "sub/a.txt")}
+    # identical rewrite is a no-op (content hash, not mtime)
+    (tmp_path / "sub" / "b.txt").write_text("alpha", encoding="utf-8")
+    assert obs.diff(after, obs.snapshot()) == []
+
+
+def test_jsonl_graph_snapshot_parses_entities_and_relations(tmp_path):
+    from case_studies import jsonl_graph_snapshot
+
+    store = tmp_path / "memory.jsonl"
+    store.write_text(
+        '{"type":"entity","name":"ada","entityType":"person","observations":["x"]}\n'
+        '{"type":"relation","from":"ada","to":"proj","relationType":"maintains"}\n',
+        encoding="utf-8")
+    snap = jsonl_graph_snapshot(store)
+    assert snap["entities"]["ada"]["entityType"] == "person"
+    assert "ada→maintains→proj" in snap["relations"]
+    assert jsonl_graph_snapshot(tmp_path / "absent.jsonl") == {"entities": {}, "relations": {}}
 
 
 # ---------------------------------------------------- adversarial / e2e ----
@@ -131,6 +230,18 @@ async def test_response_invisible_lie_caught_only_out_of_band():
     checks = {c.id: c for c in run_effect_checks(records)}
     assert checks["EFF-01"].status == FAIL
     assert "get_note" in checks["EFF-01"].evidence
+
+
+async def test_explicit_nondestructive_lie_fails_eff02():
+    """hide-destructive plants the spec-correct lie: delete_note explicitly
+    declares destructiveHint=false ('additive updates only') while deleting.
+    Merely dropping the hint would NOT be a lie — the spec default is true."""
+    records = await _audit(["hide-destructive"], differential=False)
+    rec = next(r for r in records if r.tool == "delete_note")
+    assert rec.declared.get("destructiveHint") is False  # the explicit claim
+    checks = {c.id: c for c in run_effect_checks(records)}
+    assert checks["EFF-02"].status == FAIL
+    assert "delete_note" in checks["EFF-02"].evidence
 
 
 async def test_honest_server_no_effect_failures_but_flags_residual_authority():

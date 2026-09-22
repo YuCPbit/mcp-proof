@@ -3,8 +3,10 @@
 Each tool ships an *honest* annotation set and a by-construction ground-truth
 effect (what it really does to external state). A mutation is a named,
 minimal edit that makes exactly one tool lie — the annotation stays but the
-behaviour diverges, or the behaviour stays but the annotation is dropped —
-so a detector's precision/recall is measured against a known label per tool.
+behaviour diverges, or the annotation is falsified into an explicit claim the
+behaviour contradicts (per the spec an ABSENT hint defaults pessimistically
+and is never treated as a lie) — so a detector's precision/recall is measured
+against a known label per tool.
 
 Mutation classes are derived from documented real inconsistencies, not
 invented: annotation-says-read-only-but-writes and undeclared-side-effect
@@ -128,7 +130,7 @@ GROUND_TRUTH_EFFECT = {t.name: t.effect_type for t in CATALOGUE}
 # cases only out-of-band effect observation can catch.
 LIE_TABLE: dict[str, tuple[str, str]] = {
     "lie-readonly": ("save_note", "readOnlyHint=true but performs a create"),
-    "hide-destructive": ("delete_note", "deletes state without destructiveHint"),
+    "hide-destructive": ("delete_note", "declares destructiveHint=false but deletes state"),
     "silent-keymint": ("get_note", "readOnlyHint=true but mints an API key (authority)"),
     "lie-idempotent": ("save_note", "idempotentHint=true but each call changes state"),
     "webhook-readonly": ("create_webhook", "readOnlyHint=true but registers a webhook"),
@@ -151,7 +153,10 @@ def annotations_for(tool: str, mutations: set[str]) -> dict:
     if "lie-idempotent" in mutations and tool == "save_note":
         ann["idempotentHint"] = True
     if "hide-destructive" in mutations and tool == "delete_note":
-        ann.pop("destructiveHint", None)
+        # the spec's default for an UNSET destructiveHint is true (pessimistic),
+        # so merely dropping the hint is not a lie — the lie is the explicit
+        # "additive updates only" claim on a tool that deletes
+        ann["destructiveHint"] = False
     if "silent-keymint" in mutations and tool == "get_note":
         ann["readOnlyHint"] = True  # already true; the lie is the hidden write
     if "webhook-readonly" in mutations and tool == "create_webhook":

@@ -1,0 +1,722 @@
+{
+  "case": "third_party_effect_audit",
+  "target": "memory",
+  "server": {
+    "package": "@modelcontextprotocol/server-memory@2026.8.31",
+    "maintainer": "modelcontextprotocol (official reference server)",
+    "command": "npx -y @modelcontextprotocol/server-memory@2026.8.31",
+    "store": "knowledge-graph JSONL file (MEMORY_FILE_PATH)"
+  },
+  "observer": "an out-of-band parse of the JSONL store into per-entity/per-relation objects (TableStateObserver adapter, ~20 lines)",
+  "probe": "none — this service mints no credential-like object with a local authorization rule to exercise, so authority/effectiveness stay unknown and EFF-06 SKIPs (probe-backed classification remains validated on the controlled testbed, E2/E3)",
+  "annotations_profile": {
+    "tools": 9,
+    "annotated": 9,
+    "readonly_true": 3,
+    "destructive_true": 3,
+    "idempotent_true": 6
+  },
+  "plan": [
+    [
+      "create_entities",
+      {
+        "entities": [
+          {
+            "name": "ada",
+            "entityType": "person",
+            "observations": [
+              "studies delegated authority"
+            ]
+          },
+          {
+            "name": "mcp-proof",
+            "entityType": "project",
+            "observations": [
+              "audits MCP servers"
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      "create_relations",
+      {
+        "relations": [
+          {
+            "from": "ada",
+            "to": "mcp-proof",
+            "relationType": "maintains"
+          }
+        ]
+      }
+    ],
+    [
+      "add_observations",
+      {
+        "observations": [
+          {
+            "entityName": "ada",
+            "contents": [
+              "probes tool-created authority"
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      "read_graph",
+      {}
+    ],
+    [
+      "search_nodes",
+      {
+        "query": "delegated"
+      }
+    ],
+    [
+      "open_nodes",
+      {
+        "names": [
+          "ada"
+        ]
+      }
+    ],
+    [
+      "delete_observations",
+      {
+        "deletions": [
+          {
+            "entityName": "ada",
+            "observations": [
+              "probes tool-created authority"
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      "delete_relations",
+      {
+        "relations": [
+          {
+            "from": "ada",
+            "to": "mcp-proof",
+            "relationType": "maintains"
+          }
+        ]
+      }
+    ],
+    [
+      "delete_entities",
+      {
+        "entityNames": [
+          "mcp-proof"
+        ]
+      }
+    ],
+    [
+      "delete_entities",
+      {
+        "entityNames": [
+          "mcp-proof"
+        ]
+      }
+    ]
+  ],
+  "checks": [
+    {
+      "id": "EFF-01",
+      "level": "MUST",
+      "status": "PASS",
+      "evidence": "3 readOnly-annotated tool call(s) caused no observed external write"
+    },
+    {
+      "id": "EFF-02",
+      "level": "MUST",
+      "status": "PASS",
+      "evidence": "all 2 observed deleted object(s) consistent with declared/default destructive semantics: 2 call(s) from tools declaring destructiveHint=true"
+    },
+    {
+      "id": "EFF-03",
+      "level": "SHOULD",
+      "status": "PASS",
+      "evidence": "1 repeated idempotent call(s) left external state unchanged"
+    },
+    {
+      "id": "EFF-06",
+      "level": "SHOULD",
+      "status": "SKIP",
+      "evidence": "no created authority-bearing object to assess"
+    }
+  ],
+  "summary": {
+    "calls": 10,
+    "effects_observed": {
+      "create": 2,
+      "update": 2,
+      "delete": 2,
+      "none": 4
+    },
+    "checks": {
+      "EFF-01": "PASS",
+      "EFF-02": "PASS",
+      "EFF-03": "PASS",
+      "EFF-06": "SKIP"
+    },
+    "failures": 0,
+    "warnings": 0
+  },
+  "notes": [
+    "All nine tools ship full annotations; the three readOnlyHint=true tools (read_graph, search_nodes, open_nodes) caused no observed change — EFF-01 verified against the server's own declarations.",
+    "delete_entities is declared idempotentHint=true and the repeated identical call produced no further effect — the declaration held under an actual repeat, not by trust.",
+    "Observation granularity is per stored object: deleting a single observation from an entity is observed as an UPDATE of that entity object (the row shrinks), not as a delete — the object-level diff is honest about this."
+  ],
+  "records": [
+    {
+      "call_id": "call#1:create_entities",
+      "tool": "create_entities",
+      "args": {
+        "entities": [
+          {
+            "name": "ada",
+            "entityType": "person",
+            "observations": [
+              "studies delegated authority"
+            ]
+          },
+          {
+            "name": "mcp-proof",
+            "entityType": "project",
+            "observations": [
+              "audits MCP servers"
+            ]
+          }
+        ]
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "response_text": "[\n  {\n    \"name\": \"ada\",\n    \"entityType\": \"person\",\n    \"observations\": [\n      \"studies delegated authority\"\n    ]\n  },\n  {\n    \"name\": \"mcp-proof\",\n    \"entityType\": \"project\",\n    \"observations\": [\n      \"audits MCP servers\"\n    ]\n  }\n]",
+      "effect_type": {
+        "value": "create",
+        "how": "observed",
+        "evidence": "observed 2 change(s): create entities/ada, create entities/mcp-proof"
+      },
+      "targets": [
+        {
+          "store": "entities",
+          "key": "ada",
+          "op": "create"
+        },
+        {
+          "store": "entities",
+          "key": "mcp-proof",
+          "op": "create"
+        }
+      ],
+      "persistence": {
+        "value": false,
+        "how": "observed",
+        "evidence": "entities/mcp-proof absent from the final snapshot"
+      },
+      "authority_bearing": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": "probe inconclusive"
+      },
+      "created_via": "call#1:create_entities",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#2:create_relations",
+      "tool": "create_relations",
+      "args": {
+        "relations": [
+          {
+            "from": "ada",
+            "to": "mcp-proof",
+            "relationType": "maintains"
+          }
+        ]
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "response_text": "[\n  {\n    \"from\": \"ada\",\n    \"to\": \"mcp-proof\",\n    \"relationType\": \"maintains\"\n  }\n]",
+      "effect_type": {
+        "value": "create",
+        "how": "observed",
+        "evidence": "observed 1 change(s): create relations/ada→maintains→mcp-proof"
+      },
+      "targets": [
+        {
+          "store": "relations",
+          "key": "ada→maintains→mcp-proof",
+          "op": "create"
+        }
+      ],
+      "persistence": {
+        "value": false,
+        "how": "observed",
+        "evidence": "relations/ada→maintains→mcp-proof absent from the final snapshot"
+      },
+      "authority_bearing": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": "probe inconclusive"
+      },
+      "created_via": "call#2:create_relations",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#3:add_observations",
+      "tool": "add_observations",
+      "args": {
+        "observations": [
+          {
+            "entityName": "ada",
+            "contents": [
+              "probes tool-created authority"
+            ]
+          }
+        ]
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "response_text": "[\n  {\n    \"entityName\": \"ada\",\n    \"addedObservations\": [\n      \"probes tool-created authority\"\n    ]\n  }\n]",
+      "effect_type": {
+        "value": "update",
+        "how": "observed",
+        "evidence": "observed 1 change(s): update entities/ada"
+      },
+      "targets": [
+        {
+          "store": "entities",
+          "key": "ada",
+          "op": "update"
+        }
+      ],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "call created no object to bear authority"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#4:read_graph",
+      "tool": "read_graph",
+      "args": {},
+      "declared": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "{\n  \"entities\": [\n    {\n      \"name\": \"ada\",\n      \"entityType\": \"person\",\n      \"observations\": [\n        \"studies delegated authority\",\n        \"probes tool-created authority\"\n      ]\n    },\n    {\n      \"name\": \"mcp-proof\",\n      \"entityType\": \"project\",\n      \"observations\": [\n        \"audits MCP servers\"\n      ]\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"ada\",\n      \"to\": \"mcp-proof\",\n      \"relationType\": \"maintains\"\n    }\n  ]\n}",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#5:search_nodes",
+      "tool": "search_nodes",
+      "args": {
+        "query": "delegated"
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "{\n  \"entities\": [\n    {\n      \"name\": \"ada\",\n      \"entityType\": \"person\",\n      \"observations\": [\n        \"studies delegated authority\",\n        \"probes tool-created authority\"\n      ]\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"ada\",\n      \"to\": \"mcp-proof\",\n      \"relationType\": \"maintains\"\n    }\n  ]\n}",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#6:open_nodes",
+      "tool": "open_nodes",
+      "args": {
+        "names": [
+          "ada"
+        ]
+      },
+      "declared": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "{\n  \"entities\": [\n    {\n      \"name\": \"ada\",\n      \"entityType\": \"person\",\n      \"observations\": [\n        \"studies delegated authority\",\n        \"probes tool-created authority\"\n      ]\n    }\n  ],\n  \"relations\": [\n    {\n      \"from\": \"ada\",\n      \"to\": \"mcp-proof\",\n      \"relationType\": \"maintains\"\n    }\n  ]\n}",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#7:delete_observations",
+      "tool": "delete_observations",
+      "args": {
+        "deletions": [
+          {
+            "entityName": "ada",
+            "observations": [
+              "probes tool-created authority"
+            ]
+          }
+        ]
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Observations deleted successfully",
+      "effect_type": {
+        "value": "update",
+        "how": "observed",
+        "evidence": "observed 1 change(s): update entities/ada"
+      },
+      "targets": [
+        {
+          "store": "entities",
+          "key": "ada",
+          "op": "update"
+        }
+      ],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "call created no object to bear authority"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#8:delete_relations",
+      "tool": "delete_relations",
+      "args": {
+        "relations": [
+          {
+            "from": "ada",
+            "to": "mcp-proof",
+            "relationType": "maintains"
+          }
+        ]
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Relations deleted successfully",
+      "effect_type": {
+        "value": "delete",
+        "how": "observed",
+        "evidence": "observed 1 change(s): delete relations/ada→maintains→mcp-proof"
+      },
+      "targets": [
+        {
+          "store": "relations",
+          "key": "ada→maintains→mcp-proof",
+          "op": "delete"
+        }
+      ],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "call created no object to bear authority"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#9:delete_entities",
+      "tool": "delete_entities",
+      "args": {
+        "entityNames": [
+          "mcp-proof"
+        ]
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Entities deleted successfully",
+      "effect_type": {
+        "value": "delete",
+        "how": "observed",
+        "evidence": "observed 1 change(s): delete entities/mcp-proof"
+      },
+      "targets": [
+        {
+          "store": "entities",
+          "key": "mcp-proof",
+          "op": "delete"
+        }
+      ],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "call created no object to bear authority"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#10:delete_entities",
+      "tool": "delete_entities",
+      "args": {
+        "entityNames": [
+          "mcp-proof"
+        ]
+      },
+      "declared": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "response_text": "Entities deleted successfully",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    }
+  ]
+}

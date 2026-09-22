@@ -98,15 +98,19 @@ async def run_audit(
 
 def detect_effect_aware(records: list[EffectRecord]) -> set[str]:
     """Flag a tool when an out-of-band state observation contradicts its
-    declared effect semantics: a readOnly tool that wrote, a delete with no
-    destructiveHint, or authority minted behind a readOnly claim."""
+    declared effect semantics: a readOnly tool that wrote, a delete under an
+    explicit destructiveHint=false claim (an unset hint defaults to true per
+    the spec and is not a claim), or authority minted behind a readOnly
+    claim."""
     flagged: set[str] = set()
     for r in records:
         ro = r.declared.get("readOnlyHint") is True
-        de = r.declared.get("destructiveHint") is True
+        de_false = r.declared.get("destructiveHint") is False
+        deleted = (any(t.op == E_DELETE for t in r.targets)
+                   or r.effect_type.value == E_DELETE)  # per-target, not headline
         if ro and r.effect_type.value in _WRITE:
             flagged.add(r.tool)
-        elif r.effect_type.value == E_DELETE and not de:
+        elif deleted and de_false:
             flagged.add(r.tool)
         elif ro and r.authority_bearing.value == A_YES and r.effect_type.value == E_CREATE:
             flagged.add(r.tool)
@@ -116,15 +120,17 @@ def detect_effect_aware(records: list[EffectRecord]) -> set[str]:
 def detect_response_level(records: list[EffectRecord]) -> set[str]:
     """The current-mcp-proof-style baseline: only the tool's RESPONSE is
     available (no external observation). Flag a readOnly tool whose response
-    narrates a write, or a delete-verb response with no destructiveHint."""
+    narrates a write, or a delete-verb response under an explicit
+    destructiveHint=false claim (same spec-default semantics as the other
+    detectors — absence is not a claim)."""
     flagged: set[str] = set()
     for r in records:
         ro = r.declared.get("readOnlyHint") is True
-        de = r.declared.get("destructiveHint") is True
+        de_false = r.declared.get("destructiveHint") is False
         verb = _RESPONSE_VERB.search(r.response_text or "")
         if ro and verb:
             flagged.add(r.tool)
-        elif verb and re.search(r"\b(deleted|removed|revoked)\b", r.response_text or "", re.I) and not de:
+        elif verb and re.search(r"\b(deleted|removed|revoked)\b", r.response_text or "", re.I) and de_false:
             flagged.add(r.tool)
     return flagged
 
@@ -132,16 +138,17 @@ def detect_response_level(records: list[EffectRecord]) -> set[str]:
 def detect_name_heuristic(records: list[EffectRecord]) -> set[str]:
     """A metadata-only baseline: flag a tool whose NAME/description contradicts
     its annotations — readOnly claimed but a mutating-looking name, or a
-    delete-looking name with no destructiveHint. Never observes behaviour."""
+    delete-looking name under an explicit destructiveHint=false claim. Never
+    observes behaviour."""
     flagged: set[str] = set()
     for r in records:
         spec = CATALOGUE_BY_NAME.get(r.tool)
         desc = spec.description if spec else ""
         ro = r.declared.get("readOnlyHint") is True
-        de = r.declared.get("destructiveHint") is True
+        de_false = r.declared.get("destructiveHint") is False
         if ro and is_destructive(r.tool, desc):
             flagged.add(r.tool)
-        elif _DELETE_NAME.search(f"{r.tool} {desc}") and not de:
+        elif _DELETE_NAME.search(f"{r.tool} {desc}") and de_false:
             flagged.add(r.tool)
     return flagged
 

@@ -25,6 +25,33 @@ jobs:
       # and test_http fails (not skips) in CI when its server can't boot
       - run: python -m pytest -q -ra
 
+  experiments:
+    # Research-reproducibility gate: re-run E1–E3 and the evaluation-page build
+    # in a fresh environment and require every output to be byte-identical to
+    # what is committed — the repository's "deterministic, byte-identical"
+    # claim, enforced rather than asserted. The real-server case studies are
+    # NOT re-run here (they need the third-party servers via npx); their
+    # committed JSON is re-rendered into the page, so builder drift against
+    # them is still caught.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: python experiments/run_all.py
+      - name: Fresh reproduction must match the committed results exactly
+        run: |
+          git diff --exit-code -- experiments/results
+          untracked="$(git status --porcelain -- experiments/results)"
+          if [ -n "$untracked" ]; then
+            echo "unexpected changes/untracked files under experiments/results:"
+            echo "$untracked"
+            exit 1
+          fi
+          echo "byte-identical reproduction OK"
+
   package:
     # Fresh-install gate: build the wheel, install it with runtime deps only,
     # then audit the zero-dependency demo server end to end. Catches broken

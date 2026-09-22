@@ -6,6 +6,8 @@
 
 **MCP 서버를 와이어 레벨에서 감사합니다. 프로토콜 준수·보안·회귀 — 그리고 효과 — 증거를 재현 가능하고 오프라인 검증 가능한 한 장의 납품 리포트로.**
 
+**v0.8은 준수 감사를 응답 경계 아래로 확장합니다 —— 툴은 `readOnlyHint: true`를 선언하고 지극히 평범한 응답을 반환하면서도, 그것을 승인한 grant가 철회된 뒤에도 작동하는 자격 증명을 발급할 수 있기 때문입니다.** 대역외 옵저버가 실제 외부 효과를 읽고, 프로브가 툴이 생성한 권한을 실제로 행사합니다. **[→ 연구 레인](docs/effect-aware-conformance.md)**
+
 `stdio + Streamable HTTP · 2026-07-28 및 legacy 두 세대 · HTML / JSON / JUnit / SARIF`
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
@@ -45,6 +47,7 @@ mcp-proof inspect python my_server.py --out baseline.json      # 계약 표면 �
 mcp-proof diff baseline.json current.json                      # BREAKING / ADDITIVE / METADATA, breaking이면 exit 1
 mcp-proof verify report.json                                   # 리포트 내부 지문을 오프라인 재검증
 mcp-proof effects --sqlite state.db -- python my_server.py     # 선언된 효과 vs 관측된 외부 효과 (v0.8)
+mcp-proof effects --fs-root data/ -- python my_server.py       # 같은 레인, 디렉터리 백엔드 서버용
 ```
 
 내장 데모 한 쌍 — 깨끗한 서버와 9곳에 위반을 심은 서버 — 으로 60초 만에 차이를 확인:
@@ -61,7 +64,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | **프로토콜 준수** | 서버가 와이어에서 MCP를 올바르게 구현한다 — 세대 협상, JSON-RPC 오류 의미론, tool/resource/prompt 표면, 출력 스키마, capability 일관성, 페이지네이션, stdout 위생 | 수제 JSON-RPC 프로브가 원시 바이트 스트림을 관찰하므로 SDK가 매끈하게 다듬는 것이 없음 |
 | **보안·위생** | 툴 메타데이터가 깨끗하다: 주입 지시문, 보이지 않는 유니코드, 유출 시크릿, 무제약 실행 표면 없음 | 결정적 정적 분석, 발견마다 해당 MSSS 컨트롤 ID를 지님 |
 | **행위 회귀** | 서버가 납품 시점과 정확히 같은 행위를 한다 | 출처 지문이 붙은 골든 픽스처의 기록/리플레이, 드리프트를 심각도로 분류 |
-| **효과 준수** (v0.8, 연구 레인) | 툴이 외부 상태에 미친 관측 효과가 선언 어노테이션과 일치한다; 생성물은 이름이 아니라 프로브로 분류된다 | 대역외 옵저버가 호출 전후로 서버의 상태 저장소를 스냅샷하고, 프로브가 생성물을 행사 — 관측 채널 필요, 아래 참조 |
+| **효과 준수** (v0.8, 연구 레인) | 툴이 외부 상태에 미친 관측 효과가 선언 어노테이션과 일치한다; 생성물은 이름이 아니라 프로브로 분류된다 | 대역외 옵저버가 호출 전후로 서버의 상태 저장소를 스냅샷하고, 프로브가 생성물을 행사 — 관측 채널(`--sqlite` / `--fs-root`) 필요, 아래 참조. 자체 테스트베드만이 아니라 서드파티 서버 3곳에서 실증 |
 
 네 레인이 하나의 리포트로 모이고, 리포트는 우선순위가 매겨진 수정 목록으로 끝나 그대로 시정 계획이 됩니다.
 
@@ -69,8 +72,9 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 감사 도구는 자신이 감사하는 대상보다 더 많은 신뢰를 얻어야 합니다. 모든 릴리스 뒤에는:
 
-- **151개 테스트**, 감사기 자신을 공격하는 적대적 스위트 포함: 페이지네이션 2페이지에 숨긴 위반, 변조된 픽스처와 매니페스트, 해시 제거 다운그레이드 시도, 판정 배너가 수정된 리포트, 과거에 빠져나가던 드리프트 유형, 유효하지 않은 합성 베이스라인 — 효과 레인에도 자체 적대 세트가 있습니다: 읽기 전용으로 주석되었지만 자격 증명을 발급해 대역외로만 탐지 가능한 툴, authority-bearing으로 분류되어서는 안 되는 지속 객체, 그리고 프로브 없는 감사에서 권한 판정이 통과가 아니라 `unknown`/SKIP으로 강등되는지.
-- **Linux·macOS·Windows × Python 3.11 / 3.12 / 3.13 CI**, 더해서 wheel을 빌드하고 새로 설치한 뒤 실제 서버에 실제 감사를 돌려 본 다음에야 출하하는 패키징 잡.
+- **160개 테스트**, 감사기 자신을 공격하는 적대적 스위트 포함: 페이지네이션 2페이지에 숨긴 위반, 변조된 픽스처와 매니페스트, 해시 제거 다운그레이드 시도, 판정 배너가 수정된 리포트, 과거에 빠져나가던 드리프트 유형, 유효하지 않은 합성 베이스라인 — 효과 레인에도 자체 적대 세트가 있습니다: 읽기 전용으로 주석되었지만 자격 증명을 발급해 대역외로만 탐지 가능한 툴, authority-bearing으로 분류되어서는 안 되는 지속 객체, 프로브 없는 감사에서 권한 판정이 통과가 아니라 `unknown`/SKIP으로 강등되는지, 그리고 create+delete를 동시에 하는 호출이 헤드라인 효과 뒤에 삭제를 숨길 수 없는지.
+- **Linux·macOS·Windows × Python 3.11 / 3.12 / 3.13 CI**, 더해서 wheel을 빌드하고 새로 설치한 뒤 실제 서버에 실제 감사를 돌려 본 다음에야 출하하는 패키징 잡 — 그리고 **E1–E3를 처음부터 재실행해 출력이 커밋된 결과와 바이트 단위로 일치하지 않으면 실패하는 experiments 잡**: 재현성 주장은 말이 아니라 CI가 강제합니다.
+- **우리가 만들지 않은 서버에서 실증**: 공개된 서드파티 MCP 서버 3곳(공식 레퍼런스 서버 둘과 커뮤니티 서버 하나 — 세 가지 저장소 유형, 어노테이션 유·무 양쪽)에 대한 케이스 스터디 감사, 증거 커밋 완료 — 아래 효과 레인 절 참조.
 - **공식 v2 SDK와 양방향 교차 검증**: 공식 클라이언트가 `server/discover`를 통해 mcp-proof의 수제 모던 테스트 서버를 받아들이고, mcp-proof는 공식 v2 SDK 서버에 대해 두 전송 모두에서 전부 초록(`scripts/crosscheck_modern_server.py`).
 - **설계상 fail-closed**: 끊긴 페이지네이션, 변조되었거나 검증 불가한 픽스처, 없는 베이스라인, 감사기 내부 오류 — 각각이 감사를 요란하게 멈춥니다. 모든 커맨드가 같은 분류로 답합니다: exit `2`와 안정된 한 줄. 트레이스백 없음, 조용히 축소되는 감사 없음, 대상에 불리한 증거가 되는 일도 없음.
 - **오프라인 검증 가능한 리포트**: `mcp-proof verify report.json`은 리포트 자체 필드에서 두 지문을 재계산합니다. 문서 지문은 독자가 보는 모든 것 — 판정 배너, 감사 상태, 요약 카운터, MSSS 표, 다음 단계 — 을 덮으므로 사후 편집은 무엇이든 검증을 깨뜨립니다. 이는 내부 일관성 증명이지 서명이 아닙니다(attestation은 로드맵에 있음).
@@ -79,7 +83,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 - 🔍 **와이어 레벨 프로토콜 체크를 모든 표면·모든 페이지·두 세대에서** — mcp-proof는 서버에 원시 JSON-RPC로 말을 걸고 세대를 자동 감지합니다: 2026-07-28 모던 세대에 32개 체크(`server/discover`, `_meta` 엔벨로프 강제, `resultType`, 캐시 가능한 모든 결과의 `ttlMs`/`cacheScope`, `-32022` 버전 거부, HTTP 라우팅 헤더 강제), initialize 핸드셰이크 세대에 27개 — 정확한 오류 코드, 스키마 유효성, 구조화 출력, stdout 위생, 세 리스트 표면의 페이지네이션 안전성, 전용 resources·prompts 레인, 그리고 **검증된 네거티브 프로브**: TOOL-07은 선언된 inputSchema를 증명 가능하게 위반하는 입력(스키마 유효한 베이스라인에서 정확히 한 필드만 변이)을 보내고, 서버가 태연히 응답하면 경고합니다 — 행(hang)은 그 자체로 별도의 발견이며 결코 거부로 계산되지 않습니다. 페이지네이션 수집기는 전 레인에 하나뿐이라 2페이지에 숨은 툴도 1페이지처럼 감사됩니다.
 - 🛡️ **공개 표준에 연결된 보안 감사** — 모든 페이지의 모든 공개 툴에 6개의 결정적 체크(툴 설명 포이즈닝, 보이지 않는/bidi 문자, 유출 자격 증명, 무제약 주입 표면, 광고된 셸 실행). 스키마 워커는 `$ref`/`allOf`/중첩/배열 요소를 꿰뚫습니다 — `config.shell.command`는 한 단계 아래에도 숨지 못합니다. 각 체크는 [MCP Server Security Standard](https://mcp-security-standard.org)의 24개 컨트롤 매트릭스(완전 문서화 23 + 미래 컨트롤 `MCP-DEPLOY-04` 플레이스홀더)의 정규 컨트롤 ID에 매핑되고, 판정이 증거를 넘지 않는 준수표로 렌더링됩니다: 완전한 직접 증거는 **met**, 깨끗하지만 간접적인 증거는 **partial**, 체크가 볼 수 없는 컨트롤은 **manual review**.
-- 🧪 **응답이 아니라 세계를 읽는 효과 체크 (v0.8)** — 관측 채널을 설정하면(SQLite 백엔드 서버는 `--sqlite`, 격리 디렉터리는 파일시스템 옵저버), 효과 레인은 매 호출 전후로 외부 상태를 스냅샷하고 객체별 create/update/delete 효과로 diff하여 유발한 호출에 귀속시킵니다. 네 개의 체크가 이를 선언 어노테이션과 대조합니다: EFF-01(`readOnlyHint: true` 툴이 관측 가능한 쓰기를 일으키지 않음), EFF-02(관측된 삭제는 `destructiveHint` 툴에서 나옴), EFF-03(`idempotentHint` 툴의 동일 인자 재호출은 무동작), EFF-06(생성된 자격 증명의 지속 유효성이 그것을 승인한 grant에 여전히 의존함 — 후보 의존을 대역외로 철회하고 객체를 재행사한 뒤 복원하여 확립). 효과 레코드의 모든 필드는 알게 된 방식 — `declared`/`observed`/`probed`/`unknown` — 을 지니며, 채널이 없는 차원은 통과 대신 SKIP합니다.
+- 🧪 **응답이 아니라 세계를 읽는 효과 체크 (v0.8)** — 관측 채널을 설정하면(SQLite 백엔드 서버는 `--sqlite`, 디렉터리 백엔드는 `--fs-root`), 효과 레인은 매 호출 전후로 외부 상태를 스냅샷하고 객체별 create/update/delete 효과로 diff하여 유발한 호출에 귀속시킵니다(op는 타깃별로 기록되므로 move가 create 뒤에 delete를 숨길 수 없습니다). 네 개의 체크가 이를 선언 어노테이션과 대조하되, 스펙의 시맨틱스를 정확히 따릅니다 — 기본값은 비관적이므로 *빠진* 힌트는 결코 지적되지 않고, 관측된 효과가 반증하는 명시적 주장만 대상입니다: EFF-01(`readOnlyHint: true` 툴이 관측 가능한 쓰기를 일으키지 않음), EFF-02(명시적 `destructiveHint: false` 아래에서 관측된 삭제 없음), EFF-03(`idempotentHint` 툴의 동일 인자 재호출은 무동작), EFF-06(생성된 자격 증명의 지속 유효성이 그것을 승인한 grant에 여전히 의존함 — 후보 의존을 대역외로 철회하고 객체를 재행사한 뒤 복원하여 확립). 효과 레코드의 모든 필드는 알게 된 방식 — `declared`/`observed`/`probed`/`unknown` — 을 지니며, 채널이 없는 차원은 통과 대신 SKIP합니다.
 - 📼 **클라이언트가 보관하고, 남을 판정하기 전에 스스로를 검증하는 회귀 스위트** — 두 프로토콜 세대 모두에서 기록. 골든 픽스처는 SHA-256 출처로 서버 행위를 동결하며 모든 콘텐츠 유형을 포함합니다(바이너리는 다이제스트로 저장되어, 바꿔치기된 이미지가 OK로 리플레이될 수 없음). 리플레이 전 무결성 게이트가 모든 계약 해시와 매니페스트 지문을 재계산합니다: 누락·변조·중복·잔존 픽스처는 조용히 건너뛰는 대신 리플레이를 중단시킵니다 — 픽스처의 저장 해시를 지우는 것은 옛 스키마가 아니라 변조로 계산되고, 계약 해시 이전의 베이스라인은 `--allow-legacy-fixtures`로 명시적으로 옵트인하지 않는 한 거부됩니다. 리플레이는 모든 드리프트를 분류하고(`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`) — 구조화/JSON 값 변화는 최소 `VALUE`, 뒤집힌 `"approved"→"denied"`가 cosmetic으로 통과할 수 없음 — 상태 의존 호출 순서를 보존합니다(연번 픽스처, 순서 민감 지문). 베이스라인은 결코 암묵적으로 생성되지 않습니다: 픽스처가 없으면 `run`은 fail-closed하며, `--record-if-missing`으로 옵트인해야만 기록합니다.
 - 📄 **사람과 기계 모두를 위한 리포트** — 자체 완결 HTML: 고정 내비게이션, 체크별 앵커(`report.html#SEC-03`), attention/passed 필터, 증거 범위 카드, 접이식 MSSS 매트릭스. 인쇄는 `--pdf`. 같은 버전 모델이 `--json`(스키마 v3), 아무 CI용 `--junit`, GitHub Security 탭용 `--sarif`로도 출력됩니다. 효과 레인은 자체 증거 페이지를 렌더링합니다: 선언 어노테이션과 관측 효과를 나란히, 응답만 보는 감사기가 읽었을 내용, 생성된 객체들, 프로브의 권한/의존 판정 — 각 값에 알게 된 방식 태그가 붙습니다.
 - 🔁 **설계된 재현성** — LLM 호출 0, API 키 0. 역할이 정직하게 분리된 두 지문: `behavior_sha256`은 서버 행위만으로 계산되고(체크 판정, 리플레이 판정, 프로토콜 사실 — 타임스탬프·지연·실행 커맨드·감사기 버전은 절대 포함 안 함), 동일한 서버 행위는 어느 머신에서든 동일하게 지문화됩니다. `run_hash`는 리포트 문서 전체 — 증거, 판정 배너, 감사 상태, 요약, MSSS 표 — 를 휘발성 타임스탬프 블록만 빼고 동결합니다. `mcp-proof verify`가 둘 다 오프라인으로 재검증: 사후 편집을 전부 깨뜨리는 내부 일관성 증명이지 서명이 아닙니다. 수용은 신뢰가 아니라 검증입니다.
@@ -98,6 +102,9 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | **위반 9곳**을 심은 데모 서버 | ❌ NOT SHIP-READY — MUST 실패 5건 + 보안 발견 5건(차단 3, 권고 2), 전부 증거와 함께 포착 | [라이브](https://yucpbit.github.io/mcp-proof/report-bad.html) |
 | 얌전한 데모 서버 | ✅ SHIP-READY — 18/18 MUST, 회귀 베이스라인 포함 전 레인 통과 | [라이브](https://yucpbit.github.io/mcp-proof/report-good.html) |
 | **효과 테스트베드 `silent-keymint` 변이** | ❌ EFF-01 FAIL — `readOnlyHint: true`로 주석된 툴이 평범한 읽기 응답을 반환하면서 `api_keys` 테이블에 행을 삽입; 대역외 상태 diff가 그 쓰기를 해당 호출에 귀속 | [효과 증거](https://yucpbit.github.io/mcp-proof/evaluation/effect-report-silent-keymint.html) |
+| **효과 케이스 스터디: 공식 memory 서버** (JSONL 저장소, 전체 어노테이션) | ✅ EFF-01/02/03 PASS — 모든 readOnly 선언·destructive 선언·멱등성 선언이 대역외 관측 아래에서 성립, `delete_entities` 반복 호출 포함; 권한 차원은 정직하게 SKIP(프로브 채널 없음) | [효과 증거](https://yucpbit.github.io/mcp-proof/evaluation/effect-report-case-memory.html) |
+| **효과 케이스 스터디: 공식 filesystem 서버** (격리 디렉터리, 기본 옵저버) | ✅ EFF-01/02/03 PASS — readOnly 툴 10개는 아무것도 쓰지 않았고, `move_file`의 관측된 삭제는 그 `destructiveHint`로 커버됨 — 바로 이 호출이 EFF-02의 헤드라인만 보는 맹점을 드러냈고(그리고 고치게 했고) | [효과 증거](https://yucpbit.github.io/mcp-proof/evaluation/effect-report-case-filesystem.html) |
+| **효과 케이스 스터디: 커뮤니티 SQLite 서버** (`@executeautomation/database-server`, 어노테이션 없음) | ✅ 정직한 강등 — 아무것도 선언되지 않아 EFF-01/03은 SKIP; 관측된 `DELETE`는 스펙의 비관적 기본값과 일치; 기본 `--sqlite` 채널로 효과는 여전히 행 단위로 귀속 | [효과 증거](https://yucpbit.github.io/mcp-proof/evaluation/effect-report-case-sqlite.html) |
 
 ## 🧪 효과 인지 연구 레인 (v0.8)
 
@@ -108,15 +115,17 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 - **계보, 세 개의 독립 필드로 유지**: `created_via`(어느 호출이 객체를 만들었나 — 관측), `authorized_by`(세션이 어느 grant 아래에서 돌았나 — 선언), `depends_on`(지속 유효성이 실제로 무엇을 요구하나 — 각 후보를 대역외로 철회하고 재행사한 뒤 복원하여 확립). 이 구분이 핵심입니다: 어느 grant에 `authorized_by`되었지만 `depends_on`에 그 grant가 없는 API 키는 grant 철회를 살아남습니다.
 - **테스트베드** (`testbed/`): 결정적 SQLite 백엔드 MCP 서버. 평범한 지속 객체(노트)와 자격 증명 객체(API 키, webhook, 공유 링크), 1비트 grant, 라이프사이클 툴, 그리고 한 번에 정확히 하나의 어노테이션 거짓을 심는 변이 플래그를 가집니다 — 문서화된 실제 사고 패턴(권한을 발급하는 읽기 경로, 캐스케이드하지 않는 철회)을 본떴습니다. 그라운드 트루스는 `testbed/saas_oracle.py`가 대역외로 읽으며, 감사 대상 MCP 표면을 결코 거치지 않습니다.
 
-세 실험이 그 위에서 돌아갑니다(`python experiments/run_all.py`, 결정적, 두 번 실행해도 JSON이 바이트 단위로 동일). 수치는 이 통제된 환경에서 심어 둔 불일치에 대한 탐지 성능입니다 — **프로덕션 유병률이 아닙니다**:
+세 실험이 그 위에서 돌아갑니다(`python experiments/run_all.py` — 결정적 파이프라인이며, CI가 재실행해 바이트 단위 일치를 강제합니다). 세 실험은 역할이 다릅니다 — E1은 탐지 실험, E2는 구성 개념 검증(persistence와 authority의 구분이 운용상 실재함), E3는 라이프사이클 측정(존재 ≠ 현재 유효성). 수치는 이 통제된 환경에서 심어 둔 불일치에 대한 탐지 성능입니다 — **프로덕션 유병률이 아닙니다**:
 
 | 실험 | 프로브 / 효과 관측 | 베이스라인 |
 |---|---|---|
-| **E1** — 선언 효과 vs 관측 효과. 정직한 서버 + 단일 거짓 6개 변이; 오라클 = 변이 장부 | precision / recall **1.000 / 1.000** | 응답 레벨 1.000 / 0.333 · 이름 휴리스틱 1.000 / 0.333 |
-| **E2** — authority-bearing vs 단순 지속. `api_key_backup`이라는 이름의 미끼 노트와 지속되지 않은 자격 증명을 포함한 8객체 코퍼스; 오라클 = 구성상의 권한 라벨 | 정확도 **1.000** | 이름 키워드 0.875 · 지속⇒권한 0.625 |
-| **E3** — 존재 vs 현재 유효성. 6개 라이프사이클 시나리오(grant 철회, 키 철회, 키 삭제, TTL 만료, 캐스케이드); 오라클 = 시나리오별 의도된 유효성 | 정확도 **1.000**, 거짓 무효 0 | 존재 0.500 · grant 상태 0.333, 거짓 무효 1 |
+| **E1 · 탐지** — 선언 효과 vs 관측 효과. 정직한 서버 + 단일 거짓 6개 변이; 오라클 = 변이 장부 | precision / recall **1.000 / 1.000** | 응답 레벨 1.000 / 0.333 · 이름 휴리스틱 1.000 / 0.333 |
+| **E2 · 구성 개념 검증** — authority-bearing vs 단순 지속. `api_key_backup`이라는 이름의 미끼 노트와 지속되지 않은 자격 증명을 포함한 8객체 코퍼스; 오라클 = 구성상의 권한 라벨 | 두 신호를 분리하도록 구축한 코퍼스에서 정확도 **1.000** | 이름 키워드 0.875 · 지속⇒권한 0.625 |
+| **E3 · 라이프사이클 측정** — 존재 vs 현재 유효성. 6개 라이프사이클 시나리오(grant 철회, 키 철회, 키 삭제, TTL 만료, 캐스케이드); 오라클 = 시나리오별 의도된 유효성 | 정확도 **1.000**, 거짓 무효 0 | 존재 0.500 · grant 상태 0.333, 거짓 무효 1 |
 
-이 레인을 뒷받침하는 두 결과: E1에서 효과가 응답에 전혀 나타나지 않는 세 거짓(`silent-keymint`, `shadow-webhook`, `phantom-write`)은 상태 diff만이 잡아냅니다 — 응답 레벨 감사기는 그것들에 구조적으로 눈이 멀고, 그것이 두 베이스라인의 recall이 0.333에 머무는 이유입니다. E3의 `grant_revoked` 시나리오에서는 grant 아래에서 생성된 키가 grant 철회 후에도 유효한 채입니다(테스트베드의 인가 규칙은 키 자신의 행을 볼 뿐 grant를 보지 않습니다 — 문서화된 OAuth 앱 잔존 사고와 같은 모양). grant 상태라는 프록시는 그것을 무력화되었다고 보고하며, 그것이 표의 유일하고 위험한 거짓 무효입니다.
+이 레인을 뒷받침하는 두 결과: E1에서 효과가 응답에 전혀 나타나지 않는 세 거짓(`silent-keymint`, `shadow-webhook`, `phantom-write`)은 상태 diff만이 잡아냅니다 — 응답 레벨 감사기는 그것들에 구조적으로 눈이 멀고, 그것이 두 베이스라인의 recall이 0.333에 머무는 이유입니다. E3의 `grant_revoked` 시나리오에서는 grant 아래에서 생성된 키가 grant 철회 후에도 유효한 채입니다(테스트베드의 인가 규칙은 키 자신의 행을 볼 뿐 grant를 보지 않습니다 — 문서화된 OAuth 앱 잔존 사고와 같은 모양). grant 상태라는 프록시는 그것을 무력화되었다고 보고하며, 그것이 표의 유일하고 위험한 거짓 무효입니다 — `authorized_by`를 `depends_on`인 것처럼 읽은 결과.
+
+**테스트베드 밖에서도**: 세 건의 케이스 스터디가 같은 측정 기기를 공개된 서드파티 서버에 겨눕니다 — 공식 memory 서버(JSONL 저장소, 전체 어노테이션), 공식 filesystem 서버(격리 디렉터리, 기본 옵저버, 전체 어노테이션), 커뮤니티 SQLite 서버(어노테이션 전무). 검증 가능한 선언은 모두 성립했고, 아무것도 선언되지 않은 곳에서는 체크가 판정을 지어내는 대신 SKIP했습니다. 그리고 filesystem 실행은 EFF-02 초기 구현의 실재하는 맹점(create+delete를 동시에 하는 호출의 헤드라인 효과가 삭제를 가림)을 드러냈고, 이는 수정되어 테스트로 고정되었습니다. 프로브 쪽은 내내 정직하게 `unknown`이었습니다 — 이 서비스들은 행사 가능한 자격 증명을 발급하지 않으므로 — 따라서 프로브 기반 권한 결과는 여전히 테스트베드 검증입니다. 증거: [평가 사이트의 케이스 스터디](https://yucpbit.github.io/mcp-proof/evaluation/#cases).
 
 방법론, 오라클 설계, 베이스라인, 관련 연구와 한계: [docs/effect-aware-conformance.md](docs/effect-aware-conformance.md) · 원시 증거가 딸린 결과: [평가 사이트](https://yucpbit.github.io/mcp-proof/evaluation/) · 재현: [experiments/README.md](experiments/README.md).
 
@@ -141,7 +150,7 @@ mcp-proof는 공식 스위트가 하지 않는 나머지 절반 — **납품 증
 ## ⚙️ 한 단계 CI
 
 ```yaml
-- uses: YuCPbit/mcp-proof@v0.8.0
+- uses: YuCPbit/mcp-proof@v0.8.1
   with:
     server-command: python my_server.py
     fixtures: fixtures/
@@ -165,9 +174,10 @@ mcp-proof는 공식 스위트가 하지 않는 나머지 절반 — **납품 증
 
 | | |
 |---|---|
-| **현재 — v0.8.0** | 효과 인지 연구 레인: 대역외 효과 관측, 프로브 기반 권한 분류, 잔존 권한 측정(`mcp-proof effects`, [`experiments/`](experiments/), [문서](docs/effect-aware-conformance.md)); 어노테이션 신뢰 시정; [평가 사이트](https://yucpbit.github.io/mcp-proof/evaluation/) |
+| **현재 — v0.8.1** | 연구 강화: 커밋된 증거가 딸린 서드파티 케이스 스터디 3건(공식 memory + filesystem 서버, 커뮤니티 SQLite 서버); 효과 체크가 스펙의 어노테이션 기본값을 정확히 따름(힌트의 부재는 결코 지적하지 않음); 타깃 단위 삭제 귀속(create+delete로도 삭제를 숨길 수 없음); `--fs-root` 관측 채널; CI가 강제하는 바이트 단위 실험 재현 |
+| **v0.8.0** | 효과 인지 연구 레인: 대역외 효과 관측, 프로브 기반 권한 분류, 잔존 권한 측정(`mcp-proof effects`, [`experiments/`](experiments/), [문서](docs/effect-aware-conformance.md)); 어노테이션 신뢰 시정; [평가 사이트](https://yucpbit.github.io/mcp-proof/evaluation/) |
 | **v0.7.2** | 진실성 패치: `verify`가 문서 전체를 지문화(리포트 스키마 v3), 픽스처 해시 제거는 변조 취급, legacy 베이스라인 fail-closed, 전 커맨드 통일 종료 코드 분류 |
-| **다음** | 2026-07-28 심화: MRTR `input_required` 라운드트립 · CI에서 공식 스위트와 교차 검증 · 실제 프로바이더용 효과 옵저버 어댑터(효과 레인의 `Observer` 인터페이스는 이미 수용 가능) |
+| **다음** | 2026-07-28 심화: MRTR `input_required` 라운드트립 · CI에서 공식 스위트와 교차 검증 · 실제 프로바이더용 **프로브** 어댑터 — 생성된 자격 증명을 실제 프로바이더에 대고 행사; 관측 쪽은 이미 서드파티 서버에서 실증 |
 | **이후** | 서명된 증거 번들(attestation) · 옵트인 의미론 레인(LLM 채점 어서션) — 결정적 코어 완성까지 보류 |
 
 릴리스 이력은 [CHANGELOG.md](CHANGELOG.md)에 있습니다.
@@ -178,7 +188,7 @@ mcp-proof는 결정적으로 증명 가능한 것만 증명하며, 어느 것이
 
 - 보안 체크는 관측 가능한 프로토콜·메타데이터 표면을 다룹니다. 배포·소스·프로세스 증거가 필요한 MSSS 컨트롤은 언제나 **manual review**로 보고됩니다 — 통과로 가정되지 않습니다.
 - **인가 플로우는 납품 리포트의 범위 밖**입니다: OAuth 핸드셰이크는 감사하지 않습니다(공식 스위트가 auth 시나리오를 다룹니다). 효과 레인이 추론하는 것은 툴이 생성하는 *authority-bearing 객체*이며, 대역외 옵저버를 갖춘 통제된 테스트베드 위에서입니다 — 프로덕션 OAuth 배포를 감사하지 않습니다.
-- **효과 레인은 측정 기기이지 블랙박스 레인이 아닙니다.** 관측 채널(SQLite 저장소, 격리 디렉터리)이 필요하고, 관측할 수 없는 시스템에 대한 효과는 `unknown`/SKIP으로 보고될 뿐 없다고 가정되지 않습니다. 수치는 합성 테스트베드에서의 탐지 성능이지 프로덕션 유병률이 아닙니다. [docs/effect-aware-conformance.md](docs/effect-aware-conformance.md) §7 참조.
+- **효과 레인은 측정 기기이지 블랙박스 레인이 아닙니다.** 관측 채널(`--sqlite`, `--fs-root`)이 필요하고, 관측할 수 없는 시스템에 대한 효과는 `unknown`/SKIP으로 보고될 뿐 없다고 가정되지 않습니다. 정량 결과는 합성 테스트베드에서의 탐지 성능입니다 — 케이스 스터디는 측정 기기가 서드파티 서버에서 작동함을 보여 주지만 검증된 것은 관측 쪽뿐이며, 프로브 기반 권한/유효성은 여전히 테스트베드 검증입니다. [docs/effect-aware-conformance.md](docs/effect-aware-conformance.md) §8 참조.
 - 자동 베이스라인은 보수적 이름/설명 휴리스틱으로 툴을 분류합니다. v0.8부터 검증되지 않은 `readOnlyHint`는 이를 무시하지 못합니다. 프로덕션 서버에 대해 기록된 베이스라인을 신뢰하기 전에 fixtures 매니페스트의 스킵 목록을 검토하세요.
 - 의미적 정확성(답의 *의미*가 맞는가)은 설계상 결정적 코어 밖에 있습니다.
 

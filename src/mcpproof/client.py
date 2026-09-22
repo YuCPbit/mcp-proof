@@ -201,9 +201,16 @@ class RawProbe:
 
 
 @asynccontextmanager
-async def open_session(cmd: list[str]):
-    """Official-SDK session for high-level tool interaction."""
-    params = StdioServerParameters(command=cmd[0], args=cmd[1:])
+async def open_session(cmd: list[str], *, env: dict[str, str] | None = None):
+    """Official-SDK session for high-level tool interaction. ``env`` adds to
+    the SDK's default child environment — for servers configured by env var
+    (e.g. a state-file path), without replacing PATH and friends."""
+    merged_env = None
+    if env:
+        from mcp.client.stdio import get_default_environment
+
+        merged_env = {**get_default_environment(), **env}
+    params = StdioServerParameters(command=cmd[0], args=cmd[1:], env=merged_env)
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             init = await session.initialize()

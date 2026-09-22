@@ -6,6 +6,8 @@
 
 **从 wire 层审计 MCP server：协议一致性、安全、行为回归——以及效果——证据汇成一份可复现、可离线验证的交付报告。**
 
+**v0.8 把一致性审计推进到响应边界之下 —— 一个工具可以声明 `readOnlyHint: true`、返回完全正常的响应，却同时铸出一把在授权它的 grant 被撤销之后依然有效的凭证。** 带外观测器读取真实的外部效果；探针实际行使工具创建出的权威。**[→ 研究通道](docs/effect-aware-conformance.md)**
+
 `stdio + Streamable HTTP · 2026-07-28 与 legacy 双协议时代 · HTML / JSON / JUnit / SARIF`
 
 [![ci](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml/badge.svg)](https://github.com/YuCPbit/mcp-proof/actions/workflows/ci.yml)
@@ -45,6 +47,7 @@ mcp-proof inspect python my_server.py --out baseline.json      # 冻结契约面
 mcp-proof diff baseline.json current.json                      # BREAKING / ADDITIVE / METADATA，breaking 时 exit 1
 mcp-proof verify report.json                                   # 离线复核报告内部指纹
 mcp-proof effects --sqlite state.db -- python my_server.py     # 声明效果 vs 观测到的外部效果（v0.8）
+mcp-proof effects --fs-root data/ -- python my_server.py       # 同一通道，目录后端的 server
 ```
 
 用内置的 demo 对照组 60 秒看出差别 —— 一个干净的 server 和一个埋了九处违规的 server：
@@ -61,7 +64,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | **协议一致性** | server 在 wire 层正确实现了 MCP —— 时代协商、JSON-RPC 错误语义、tool/resource/prompt 三个 surface、输出 schema、能力一致性、分页、stdout 卫生 | 手写 JSON-RPC 探针直接观察原始字节流，没有任何东西被 SDK 抹平 |
 | **安全与卫生** | 工具元数据干净：没有注入指令、隐形 Unicode、泄漏的密钥、无约束的执行面 | 确定性静态分析，每条发现携带对应的 MSSS 控制 ID |
 | **行为回归** | server 的行为与交付时完全一致 | 带来源指纹的黄金 fixture 录制/重放，漂移按严重度分级 |
-| **效果一致性**（v0.8，研究通道） | 工具对外部状态的实际效果与其声明的 annotation 相符；创建出的对象靠探针分类，而不是靠名字 | 带外观测器在每次调用前后快照 server 的状态存储；探针实际行使创建出的对象 —— 需要观测信道，见下文 |
+| **效果一致性**（v0.8，研究通道） | 工具对外部状态的实际效果与其声明的 annotation 相符；创建出的对象靠探针分类，而不是靠名字 | 带外观测器在每次调用前后快照 server 的状态存储；探针实际行使创建出的对象 —— 需要观测信道（`--sqlite` / `--fs-root`），见下文。已在三个第三方 server 上实测，而不只是我们自己的 testbed |
 
 四条通道汇入同一份报告，报告以按优先级排序的修复清单收尾，可以直接当整改计划用。
 
@@ -69,8 +72,9 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 审计工具必须比它审计的东西赢得更多信任。每个版本背后有：
 
-- **151 个测试**，含攻击审计器自身的对抗套件：藏在分页列表第 2 页的违规、被篡改的 fixture 与 manifest、剥离哈希的降级尝试、改写过结论横幅的报告、曾经漏网的漂移类别、不合法的合成基线 —— 效果通道也有自己的对抗集：一个标注只读却铸出凭证、只有带外才能发现的工具；一个绝不能被判为 authority-bearing 的持久对象；以及一次无探针审计，其权威结论必须退化为 `unknown`/SKIP 而不是通过。
-- **Linux、macOS、Windows × Python 3.11 / 3.12 / 3.13 的 CI**，外加一个打包任务：构建 wheel、全新安装、对真实 server 跑一次完整审计，然后才允许发布。
+- **160 个测试**，含攻击审计器自身的对抗套件：藏在分页列表第 2 页的违规、被篡改的 fixture 与 manifest、剥离哈希的降级尝试、改写过结论横幅的报告、曾经漏网的漂移类别、不合法的合成基线 —— 效果通道也有自己的对抗集：一个标注只读却铸出凭证、只有带外才能发现的工具；一个绝不能被判为 authority-bearing 的持久对象；一次无探针审计，其权威结论必须退化为 `unknown`/SKIP 而不是通过；以及一次"边建边删"的调用，其删除不得藏在 headline 效果之后。
+- **Linux、macOS、Windows × Python 3.11 / 3.12 / 3.13 的 CI**，外加一个打包任务：构建 wheel、全新安装、对真实 server 跑一次完整审计，然后才允许发布 —— 还有一个 **experiments 任务：在全新环境里从零重跑 E1–E3，输出与仓库提交的结果不逐字节一致就失败** —— 可复现性由 CI 强制执行，而不是口头声明。
+- **在不是我们写的 server 上实测过**：对三个已发布的第三方 MCP server 的 case-study 审计（两个官方参考 server 加一个社区 server —— 三种存储类型，有 / 无 annotation 两种姿态），证据已提交 —— 见下文效果通道一节。
 - **与官方 v2 SDK 双向交叉验证**：官方客户端通过 `server/discover` 接纳 mcp-proof 手写的现代测试 server，mcp-proof 对官方 v2 SDK server 在两种传输上全绿（`scripts/crosscheck_modern_server.py`）。
 - **设计上 fail-closed**：分页中断、fixture 被篡改或无法验证、基线缺失、审计器内部错误 —— 每一种都大声中止审计；所有命令用同一套分类回答：exit `2` 加一行稳定输出，从无 traceback，从不悄悄缩小审计范围，也从不构成对目标的指控。
 - **可离线验证的报告**：`mcp-proof verify report.json` 用报告自身字段重算两枚指纹；文档指纹覆盖读者看到的一切 —— 结论横幅、审计状态、汇总计数、MSSS 表、后续步骤 —— 任何事后编辑都会破坏它。这是内部一致性证明，不是签名（attestation 在路线图上）。
@@ -79,7 +83,7 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 
 - 🔍 **wire 层协议检查覆盖每个 surface、每一页、两个时代** —— mcp-proof 对 server 直接说原始 JSON-RPC 并自动探测其时代：2026-07-28 现代时代 32 项检查（`server/discover`、`_meta` envelope 强制、`resultType`、每个可缓存结果上的 `ttlMs`/`cacheScope`、`-32022` 版本拒绝、HTTP 路由头强制），initialize 握手时代 27 项 —— 精确错误码、schema 合法性、结构化输出、stdout 卫生、三个列表 surface 的分页安全、专门的 resources 与 prompts 通道，以及**经验证的否定探针**：TOOL-07 发送可证明违反声明 inputSchema 的输入（schema 合法的基线上恰好变异一个字段），server 正常应答则告警 —— 挂起被当作独立发现，绝不算作拒绝。所有通道共用一个分页收集器，藏在第 2 页的工具和第 1 页被同样审计。
 - 🛡️ **挂靠公开标准的安全审计** —— 对每一页上的每个声明工具做 6 项确定性检查（工具描述投毒、隐形/bidi 字符、泄漏凭证、无约束注入面、声明的 shell 执行），schema walker 能穿透 `$ref`/`allOf`/嵌套/数组项 —— `config.shell.command` 藏在一层之下也躲不掉。每项检查映射到 [MCP Server Security Standard](https://mcp-security-standard.org) 24 项控制矩阵的规范控制 ID（23 项有完整文档，外加 `MCP-DEPLOY-04` 未来控制占位），渲染为一张结论从不超出证据的合规表：完整直接证据是 **met**，干净但间接的证据是 **partial**，检查看不到的控制是 **manual review**。
-- 🧪 **读世界、不读响应的效果检查（v0.8）** —— 配置好观测信道后（SQLite 后端 server 用 `--sqlite`；jail 目录另有文件系统观测器），效果通道在每次调用前后快照外部状态，diff 成逐对象的 create/update/delete 效果并归因到引发它的那次调用。四项检查将其与声明的 annotation 对照：EFF-01（`readOnlyHint: true` 的工具未引发任何观测到的写入）、EFF-02（观测到的删除来自带 `destructiveHint` 的工具）、EFF-03（`idempotentHint` 工具的重复同参调用是无操作）、EFF-06（创建出的凭证的持续有效性仍依赖授权它的 grant —— 做法是带外撤销每个候选依赖、重新行使对象、再恢复）。效果记录的每个字段都标明来历 —— `declared`、`observed`、`probed` 或 `unknown` —— 没有信道的维度报 SKIP 而不是通过。
+- 🧪 **读世界、不读响应的效果检查（v0.8）** —— 配置好观测信道后（SQLite 后端 server 用 `--sqlite`，目录后端用 `--fs-root`），效果通道在每次调用前后快照外部状态，diff 成逐对象的 create/update/delete 效果并归因到引发它的那次调用（op 记录到每个对象，move 不可能拿 create 掩盖 delete）。四项检查将其与声明的 annotation 对照，并严格遵循规范的语义 —— 缺省值是悲观的，所以*缺失*的 hint 从不被标记，只有被观测效果证伪的显式声明才算：EFF-01（`readOnlyHint: true` 的工具未引发任何观测到的写入）、EFF-02（显式 `destructiveHint: false` 之下不得出现观测到的删除）、EFF-03（`idempotentHint` 工具的重复同参调用是无操作）、EFF-06（创建出的凭证的持续有效性仍依赖授权它的 grant —— 做法是带外撤销每个候选依赖、重新行使对象、再恢复）。效果记录的每个字段都标明来历 —— `declared`、`observed`、`probed` 或 `unknown` —— 没有信道的维度报 SKIP 而不是通过。
 - 📼 **client 可以留存、且先自证完整再评判他人的回归套件** —— 两个协议时代都能录制；黄金 fixture 用 SHA-256 来源指纹冻结 server 行为，覆盖每种内容类型（二进制载荷存摘要，换掉的图片不可能重放成 OK）。重放前有完整性门：重算每个合约哈希和 manifest 指纹 —— 缺失、篡改、重复、过期的 fixture 都会中止重放而不是被静默跳过；删掉 fixture 存储的哈希算作篡改而不是旧格式，早于合约哈希的基线除非用 `--allow-legacy-fixtures` 显式豁免否则被拒绝。重放对每条漂移分级（`BREAKING` / `VALUE` / `COSMETIC` / `LATENCY`）—— 任何结构化或 JSON 值变化至少是 `VALUE`，翻转的 `"approved"→"denied"` 不可能混过 cosmetic —— 并保持有状态调用顺序（fixture 带序号、指纹对顺序敏感）。基线从不被隐式创建：fixture 缺失时 `run` fail-closed，除非用 `--record-if-missing` 显式豁免。
 - 📄 **同时给人和机器看的报告** —— 自包含 HTML：粘性导航、逐检查锚点（`report.html#SEC-03`）、attention/passed 过滤器、证据范围卡、可折叠 MSSS 矩阵；`--pdf` 供打印。同一份带版本的模型输出为 `--json`（schema v3）、给任意 CI 的 `--junit`、给 GitHub Security 标签页的 `--sarif`。效果通道有自己的证据页：声明的 annotation 与观测到的效果并排、只看响应的审计器会读到什么、产生了哪些对象、探针的权威/依赖结论，每个值都带着来历标记。
 - 🔁 **可复现是设计出来的** —— 零 LLM 调用、零 API key。两枚职责分明的指纹：`behavior_sha256` 只由 server 行为计算（检查结论、重放结论、协议事实 —— 从不含时间戳、延迟、启动命令或审计器版本），相同的 server 行为在任何机器上指纹相同；`run_hash` 冻结整份报告文档 —— 证据、结论横幅、审计状态、汇总、MSSS 表 —— 只减去易变的时间戳块。`mcp-proof verify` 离线复核两者：任何事后编辑都会破坏的内部一致性证明，不是签名。验收靠验证，不靠信任。
@@ -98,6 +102,9 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 | 埋有 **9 处违规**的 demo server | ❌ NOT SHIP-READY — 5 项 MUST 失败 + 5 条安全发现（3 阻断、2 建议），每条都带证据被抓获 | [在线报告](https://yucpbit.github.io/mcp-proof/report-bad.html) |
 | 行为良好的 demo server | ✅ SHIP-READY — 18/18 MUST，三通道全过，含回归基线 | [在线报告](https://yucpbit.github.io/mcp-proof/report-good.html) |
 | **效果 testbed 的 `silent-keymint` 变体** | ❌ EFF-01 FAIL — 一个标注 `readOnlyHint: true` 的工具返回正常的读取响应，同时向 `api_keys` 表插入一行；带外状态 diff 把这次写入归因到该调用 | [效果证据](https://yucpbit.github.io/mcp-proof/evaluation/effect-report-silent-keymint.html) |
+| **效果 case study：官方 memory server**（JSONL 存储，全量 annotation） | ✅ EFF-01/02/03 PASS — 每条 readOnly 声明、destructive 声明与幂等声明都在带外观测下成立，包括重复调用 `delete_entities`；权威维度诚实地 SKIP（无探针信道） | [效果证据](https://yucpbit.github.io/mcp-proof/evaluation/effect-report-case-memory.html) |
+| **效果 case study：官方 filesystem server**（jail 目录，stock 观测器） | ✅ EFF-01/02/03 PASS — 10 个只读工具零写入；`move_file` 观测到的删除被其 `destructiveHint` 覆盖 —— 正是这次调用暴露（并修复）了 EFF-02 只看 headline 的盲区 | [效果证据](https://yucpbit.github.io/mcp-proof/evaluation/effect-report-case-filesystem.html) |
+| **效果 case study：社区 SQLite server**（`@executeautomation/database-server`，零 annotation） | ✅ 诚实降级 — 什么都没声明，EFF-01/03 SKIP；观测到的 `DELETE` 与规范的悲观缺省一致；stock `--sqlite` 信道仍逐行归因效果 | [效果证据](https://yucpbit.github.io/mcp-proof/evaluation/effect-report-case-sqlite.html) |
 
 ## 🧪 效果感知研究通道（v0.8）
 
@@ -108,15 +115,17 @@ mcp-proof run python demo/bad_server.py --out report-bad.html                   
 - **谱系，保持为三个独立字段**：`created_via`（哪次调用产出了对象 —— 观测所得）、`authorized_by`（会话运行在哪个 grant 之下 —— 声明所得）、`depends_on`（持续有效性实际需要什么 —— 通过带外撤销每个候选、重新行使、再恢复而确立）。区分本身就是要点：一个 `authorized_by` 某 grant、而 `depends_on` 不含该 grant 的 API key，会在 grant 被撤销后存活。
 - **testbed**（`testbed/`）：确定性的 SQLite 后端 MCP server，有普通持久对象（笔记）和凭证对象（API key、webhook、分享链接）、一比特 grant、生命周期工具，以及每次恰好植入一个 annotation 谎言的变异开关 —— 建模自有文档的真实事故模式（读路径铸出权威；撤销不级联）。地面真值由 `testbed/saas_oracle.py` 带外读取，从不经过被审计的 MCP surface。
 
-三个实验对着它运行（`python experiments/run_all.py`，确定性，两次运行的 JSON 逐字节相同）。这些数字是此受控环境中对植入不一致的检测表现 —— **不是生产环境流行度**：
+三个实验对着它运行（`python experiments/run_all.py` —— 确定性管线，CI 会重跑并强制输出逐字节一致）。三者分工不同 —— E1 是检测实验，E2 是构念验证（persistence 与 authority 的区分在操作层面真实存在），E3 是生命周期测量（存在 ≠ 当前有效）。这些数字是此受控环境中对植入不一致的检测表现 —— **不是生产环境流行度**：
 
 | 实验 | 探针 / 效果观测 | baseline |
 |---|---|---|
-| **E1** — 声明效果 vs 观测效果，诚实 server + 6 个单谎言变体；oracle = 变异台账 | precision / recall **1.000 / 1.000** | 响应级 1.000 / 0.333 · 名字启发式 1.000 / 0.333 |
-| **E2** — authority-bearing vs 仅仅持久，8 对象语料，含名为 `api_key_backup` 的诱饵笔记和一个从未持久化的凭证；oracle = 构造即得的权威标签 | 准确率 **1.000** | 名字关键词 0.875 · 持久即权威 0.625 |
-| **E3** — 存在性 vs 当前有效性，6 个生命周期场景（撤 grant、撤 key、删 key、TTL 过期、级联）；oracle = 每场景的应然有效性 | 准确率 **1.000**，0 次假失效 | 存在性 0.500 · grant 状态 0.333，1 次假失效 |
+| **E1 · 检测** — 声明效果 vs 观测效果，诚实 server + 6 个单谎言变体；oracle = 变异台账 | precision / recall **1.000 / 1.000** | 响应级 1.000 / 0.333 · 名字启发式 1.000 / 0.333 |
+| **E2 · 构念验证** — authority-bearing vs 仅仅持久，8 对象语料，含名为 `api_key_backup` 的诱饵笔记和一个从未持久化的凭证；oracle = 构造即得的权威标签 | 在为分离这两种信号而构造的语料上准确率 **1.000** | 名字关键词 0.875 · 持久即权威 0.625 |
+| **E3 · 生命周期测量** — 存在性 vs 当前有效性，6 个生命周期场景（撤 grant、撤 key、删 key、TTL 过期、级联）；oracle = 每场景的应然有效性 | 准确率 **1.000**，0 次假失效 | 存在性 0.500 · grant 状态 0.333，1 次假失效 |
 
-支撑这条通道的两个结果：E1 里效果从不出现在响应中的三个谎言（`silent-keymint`、`shadow-webhook`、`phantom-write`）只有状态 diff 能抓到 —— 只看响应的审计器对它们结构性失明，这正是两个 baseline 召回率都是 0.333 的原因。E3 的 `grant_revoked` 场景里，grant 之下创建的 key 在 grant 被撤销后仍然有效（testbed 的授权规则查的是 key 自己那一行，不查 grant —— 与有文档记录的 OAuth 应用持久化事故同构）；grant 状态这个代理判它已失效，就是表里那一次危险的假失效。
+支撑这条通道的两个结果：E1 里效果从不出现在响应中的三个谎言（`silent-keymint`、`shadow-webhook`、`phantom-write`）只有状态 diff 能抓到 —— 只看响应的审计器对它们结构性失明，这正是两个 baseline 召回率都是 0.333 的原因。E3 的 `grant_revoked` 场景里，grant 之下创建的 key 在 grant 被撤销后仍然有效（testbed 的授权规则查的是 key 自己那一行，不查 grant —— 与有文档记录的 OAuth 应用持久化事故同构）；grant 状态这个代理判它已失效，就是表里那一次危险的假失效 —— 把 `authorized_by` 误读成了 `depends_on`。
+
+**走出 testbed**：三个 case study 用同一套 instrument 审计已发布的第三方 server —— 官方 memory server（JSONL 存储，全量 annotation）、官方 filesystem server（jail 目录，stock 观测器，全量 annotation）、一个社区 SQLite server（零 annotation）。所有可检验的声明全部成立；没有声明的地方检查 SKIP 而不是编造结论；filesystem 那次运行还暴露了 EFF-02 初版实现的一个真实盲区（"边建边删"的调用把删除藏在了 headline 效果后面），现已修复并被回归测试钉住。探针维度全程诚实地保持 `unknown` —— 这些服务都不铸造可行使的凭证 —— 所以探针化的权威结论仍然只有 testbed 验证。证据：[评测站的 case studies](https://yucpbit.github.io/mcp-proof/evaluation/#cases)。
 
 方法论、oracle 设计、baseline、相关工作与局限：[docs/effect-aware-conformance.md](docs/effect-aware-conformance.md) · 带原始证据的结果：[评测站](https://yucpbit.github.io/mcp-proof/evaluation/) · 复现：[experiments/README.md](experiments/README.md)。
 
@@ -141,7 +150,7 @@ mcp-proof 为官方套件不做的那一半而存在：**交付证据**。client
 ## ⚙️ 一步接入 CI
 
 ```yaml
-- uses: YuCPbit/mcp-proof@v0.8.0
+- uses: YuCPbit/mcp-proof@v0.8.1
   with:
     server-command: python my_server.py
     fixtures: fixtures/
@@ -165,9 +174,10 @@ server 不达 ship-ready 则任务失败，并留下 `mcp-proof-report.html` / `
 
 | | |
 |---|---|
-| **当前 — v0.8.0** | 效果感知研究通道：带外效果观测、探针化权威分类、残留权威测量（`mcp-proof effects`、[`experiments/`](experiments/)、[文档](docs/effect-aware-conformance.md)）；annotation 信任修正；[评测站](https://yucpbit.github.io/mcp-proof/evaluation/) |
+| **当前 — v0.8.1** | 研究加固：三个第三方 case study 及已提交的证据（官方 memory + filesystem server、社区 SQLite server）；效果检查严格对齐规范的 annotation 缺省语义（缺失的 hint 从不被标记）；逐对象删除归因（"边建边删"藏不住删除）；`--fs-root` 观测信道；CI 强制的逐字节实验复现 |
+| **v0.8.0** | 效果感知研究通道：带外效果观测、探针化权威分类、残留权威测量（`mcp-proof effects`、[`experiments/`](experiments/)、[文档](docs/effect-aware-conformance.md)）；annotation 信任修正；[评测站](https://yucpbit.github.io/mcp-proof/evaluation/) |
 | **v0.7.2** | 真实性补丁：`verify` 指纹覆盖全文档（报告 schema v3）、剥离 fixture 哈希视同篡改、legacy 基线 fail-closed、全命令统一退出码分类 |
-| **下一步** | 2026-07-28 深化：MRTR `input_required` 往返 · CI 内与官方套件交叉验证 · 真实 provider 的效果观测适配器（效果通道的 `Observer` 接口已为此留好） |
+| **下一步** | 2026-07-28 深化：MRTR `input_required` 往返 · CI 内与官方套件交叉验证 · 真实 provider 的**探针**适配器 —— 对真实 provider 行使创建出的凭证；观测那一半已在第三方 server 上实测 |
 | **之后** | 签名证据包（attestation）· 可选语义通道（LLM 评分断言）—— 在确定性内核完成前搁置 |
 
 版本历史见 [CHANGELOG.md](CHANGELOG.md)。
@@ -178,7 +188,7 @@ mcp-proof 只证明可被确定性证明的东西，并明确说出哪些是哪�
 
 - 安全检查覆盖可观测的协议与元数据面。需要部署、源码或流程证据的 MSSS 控制永远标 **manual review** —— 绝不默认通过。
 - **授权流程不在交付报告范围内**：不审计 OAuth 握手（官方套件覆盖 auth 场景）。效果通道推理的是工具创建的 *authority-bearing 对象*，在带外观测器的受控 testbed 上 —— 它不审计生产 OAuth 部署。
-- **效果通道是测量仪器，不是黑盒通道。** 它需要观测信道（SQLite 存储、jail 目录）；观测不到的系统的效果报 `unknown`/SKIP，绝不假设为无。它的数字是合成 testbed 上的检测表现，不是生产流行度。见 [docs/effect-aware-conformance.md](docs/effect-aware-conformance.md) §7。
+- **效果通道是测量仪器，不是黑盒通道。** 它需要观测信道（`--sqlite`、`--fs-root`）；观测不到的系统的效果报 `unknown`/SKIP，绝不假设为无。它的量化数字是合成 testbed 上的检测表现 —— case study 证明 instrument 能在第三方 server 上工作，但验证的只是观测那一半：探针化的权威/有效性结论仍然只有 testbed 验证。见 [docs/effect-aware-conformance.md](docs/effect-aware-conformance.md) §8。
 - 自动基线用保守的名字/描述启发式分类工具；自 v0.8 起未经验证的 `readOnlyHint` 不再覆盖它。对生产 server 信任一份录制基线之前，请先审阅 fixtures manifest 里的跳过清单。
 - 语义正确性（答案的*含义*对不对）有意置于确定性内核之外。
 

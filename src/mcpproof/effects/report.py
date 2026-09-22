@@ -30,14 +30,20 @@ def _e(s) -> str:
     return html.escape(str(s))
 
 
+def _deleted(rec: EffectRecord) -> bool:
+    # per-target ops, not the headline: a create+delete call headlines "create"
+    return any(t.op == "delete" for t in rec.targets) or rec.effect_type.value == "delete"
+
+
 def _contradiction(rec: EffectRecord) -> str | None:
     ro = rec.declared.get("readOnlyHint") is True
-    de = rec.declared.get("destructiveHint") is True
     if ro and rec.effect_type.value in _WRITE:
         extra = " and minted authority" if rec.authority_bearing.value == A_YES else ""
         return f"declared read-only, but observed a {rec.effect_type.value}{extra}"
-    if rec.effect_type.value == "delete" and not de:
-        return "deleted external state without declaring destructiveHint"
+    # only an explicit destructiveHint=false is a claim a delete can falsify;
+    # an unset hint defaults to true per the spec and is never a contradiction
+    if _deleted(rec) and rec.declared.get("destructiveHint") is False:
+        return "declares destructiveHint=false, but deleted external state"
     return None
 
 
@@ -106,7 +112,8 @@ def _ledger_row(r: EffectRecord) -> str:
     declared = ", ".join(f"{k}={v}" for k, v in r.declared.items()) or "—"
     eff = r.effect_type.value
     eff_cls = "write" if eff in _WRITE else "read"
-    targets = ", ".join(f"{t.store}/{t.key}" for t in r.targets) or "—"
+    targets = ", ".join(
+        f"{t.op + ' ' if t.op else ''}{t.store}/{t.key}" for t in r.targets) or "—"
     auth = r.authority_bearing
     auth_txt = {"yes": "authority-bearing", "no": "not authority", "unknown": "unknown"}.get(
         auth.value, auth.value)

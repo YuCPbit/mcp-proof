@@ -63,13 +63,21 @@ class Evidenced:
 @dataclass
 class TargetRef:
     """One external object a call touched, identified independently of the
-    tool's response (store + primary key from the out-of-band snapshot)."""
+    tool's response (store + primary key from the out-of-band snapshot), and
+    what happened to it (create/update/delete). Per-target ops matter: a call
+    can create one object AND delete another (a file move, a rotate), and the
+    record's headline effect_type keeps only the highest-precedence op — a
+    delete check that read only the headline would be blind to such a call."""
 
     store: str
     key: str
+    op: str = ""  # create | update | delete ("" on legacy records)
 
     def to_dict(self) -> dict:
-        return {"store": self.store, "key": self.key}
+        d = {"store": self.store, "key": self.key}
+        if self.op:
+            d["op"] = self.op
+        return d
 
     def __hash__(self) -> int:
         return hash((self.store, self.key))
@@ -133,7 +141,8 @@ class EffectRecord:
             declared=d.get("declared", {}), response_text=d.get("response_text", ""),
         )
         rec.effect_type = ev(d["effect_type"])
-        rec.targets = [TargetRef(t["store"], t["key"]) for t in d.get("targets", [])]
+        rec.targets = [TargetRef(t["store"], t["key"], t.get("op", ""))
+                       for t in d.get("targets", [])]
         rec.persistence = ev(d["persistence"])
         rec.authority_bearing = ev(d["authority_bearing"])
         rec.created_via = d.get("created_via", "")

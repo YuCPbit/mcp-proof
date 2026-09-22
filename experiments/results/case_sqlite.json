@@ -1,0 +1,564 @@
+{
+  "case": "third_party_effect_audit",
+  "target": "sqlite",
+  "server": {
+    "package": "@executeautomation/database-server@1.1.0",
+    "maintainer": "ExecuteAutomation (community)",
+    "command": "npx -y @executeautomation/database-server@1.1.0 <db>",
+    "store": "SQLite database file"
+  },
+  "observer": "the stock SqliteObserver (generic sqlite_master introspection) over the DB file — the same channel `mcp-proof effects --sqlite` ships; zero target-specific code",
+  "probe": "none — this service mints no credential-like object with a local authorization rule to exercise, so authority/effectiveness stay unknown and EFF-06 SKIPs (probe-backed classification remains validated on the controlled testbed, E2/E3)",
+  "annotations_profile": {
+    "tools": 10,
+    "annotated": 0,
+    "readonly_true": 0,
+    "destructive_true": 0,
+    "idempotent_true": 0
+  },
+  "plan": [
+    [
+      "create_table",
+      {
+        "query": "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, qty INTEGER)"
+      }
+    ],
+    [
+      "write_query",
+      {
+        "query": "INSERT INTO items (name, qty) VALUES ('anvil', 3)"
+      }
+    ],
+    [
+      "write_query",
+      {
+        "query": "INSERT INTO items (name, qty) VALUES ('rope', 10)"
+      }
+    ],
+    [
+      "read_query",
+      {
+        "query": "SELECT * FROM items ORDER BY id"
+      }
+    ],
+    [
+      "list_tables",
+      {}
+    ],
+    [
+      "describe_table",
+      {
+        "table_name": "items"
+      }
+    ],
+    [
+      "write_query",
+      {
+        "query": "UPDATE items SET qty = 4 WHERE name = 'anvil'"
+      }
+    ],
+    [
+      "write_query",
+      {
+        "query": "DELETE FROM items WHERE name = 'rope'"
+      }
+    ],
+    [
+      "append_insight",
+      {
+        "insight": "rope stock was removed"
+      }
+    ],
+    [
+      "list_insights",
+      {}
+    ]
+  ],
+  "checks": [
+    {
+      "id": "EFF-01",
+      "level": "MUST",
+      "status": "SKIP",
+      "evidence": "no exercised tool declared readOnlyHint=true"
+    },
+    {
+      "id": "EFF-02",
+      "level": "MUST",
+      "status": "PASS",
+      "evidence": "all 1 observed deleted object(s) consistent with declared/default destructive semantics: 1 call(s) from tools leaving destructiveHint unset (spec default: true — hosts must already treat them as destructive)"
+    },
+    {
+      "id": "EFF-03",
+      "level": "SHOULD",
+      "status": "SKIP",
+      "evidence": "no idempotentHint-annotated (non-readOnly) tool was called twice with identical arguments"
+    },
+    {
+      "id": "EFF-06",
+      "level": "SHOULD",
+      "status": "SKIP",
+      "evidence": "no created authority-bearing object to assess"
+    }
+  ],
+  "summary": {
+    "calls": 10,
+    "effects_observed": {
+      "create": 3,
+      "update": 1,
+      "delete": 1,
+      "none": 5
+    },
+    "checks": {
+      "EFF-01": "SKIP",
+      "EFF-02": "PASS",
+      "EFF-03": "SKIP",
+      "EFF-06": "SKIP"
+    },
+    "failures": 0,
+    "warnings": 0
+  },
+  "notes": [
+    "No tool declares any annotation — the ecosystem's common case. EFF-01/03 SKIP (nothing declared to verify); the observed DELETE from write_query is covered by the spec's pessimistic default for an unset destructiveHint and is therefore consistent, not a contradiction.",
+    "Effects are still attributed per row (create/update/delete of items/<id>) even with nothing declared — observation does not depend on annotations.",
+    "append_insight turned out to persist into a table the audit never created (mcp_insights) — caught because the observer introspects sqlite_master rather than diffing a hand-listed table set. (Its archived Python predecessor kept insights in process memory; verifying before writing this note corrected our own assumption.)",
+    "Observation granularity, honestly: create_table of an EMPTY table is a schema-level change below the row-level diff (no rows → no per-object delta); the table becomes visible the moment it holds a row. The record for create_table therefore shows no observed per-object change."
+  ],
+  "records": [
+    {
+      "call_id": "call#1:create_table",
+      "tool": "create_table",
+      "args": {
+        "query": "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT, qty INTEGER)"
+      },
+      "declared": {},
+      "response_text": "{\n  \"success\": true,\n  \"message\": \"Table created successfully\"\n}",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#2:write_query",
+      "tool": "write_query",
+      "args": {
+        "query": "INSERT INTO items (name, qty) VALUES ('anvil', 3)"
+      },
+      "declared": {},
+      "response_text": "{\n  \"affected_rows\": 1\n}",
+      "effect_type": {
+        "value": "create",
+        "how": "observed",
+        "evidence": "observed 1 change(s): create items/1"
+      },
+      "targets": [
+        {
+          "store": "items",
+          "key": "1",
+          "op": "create"
+        }
+      ],
+      "persistence": {
+        "value": true,
+        "how": "observed",
+        "evidence": "items/1 present in the final snapshot"
+      },
+      "authority_bearing": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": "probe inconclusive"
+      },
+      "created_via": "call#2:write_query",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#3:write_query",
+      "tool": "write_query",
+      "args": {
+        "query": "INSERT INTO items (name, qty) VALUES ('rope', 10)"
+      },
+      "declared": {},
+      "response_text": "{\n  \"affected_rows\": 1\n}",
+      "effect_type": {
+        "value": "create",
+        "how": "observed",
+        "evidence": "observed 1 change(s): create items/2"
+      },
+      "targets": [
+        {
+          "store": "items",
+          "key": "2",
+          "op": "create"
+        }
+      ],
+      "persistence": {
+        "value": false,
+        "how": "observed",
+        "evidence": "items/2 absent from the final snapshot"
+      },
+      "authority_bearing": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": "probe inconclusive"
+      },
+      "created_via": "call#3:write_query",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#4:read_query",
+      "tool": "read_query",
+      "args": {
+        "query": "SELECT * FROM items ORDER BY id"
+      },
+      "declared": {},
+      "response_text": "[\n  {\n    \"id\": 1,\n    \"name\": \"anvil\",\n    \"qty\": 3\n  },\n  {\n    \"id\": 2,\n    \"name\": \"rope\",\n    \"qty\": 10\n  }\n]",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#5:list_tables",
+      "tool": "list_tables",
+      "args": {},
+      "declared": {},
+      "response_text": "[\n  \"items\"\n]",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#6:describe_table",
+      "tool": "describe_table",
+      "args": {
+        "table_name": "items"
+      },
+      "declared": {},
+      "response_text": "[\n  {\n    \"name\": \"id\",\n    \"type\": \"INTEGER\",\n    \"notnull\": false,\n    \"default_value\": null,\n    \"primary_key\": true\n  },\n  {\n    \"name\": \"name\",\n    \"type\": \"TEXT\",\n    \"notnull\": false,\n    \"default_value\": null,\n    \"primary_key\": false\n  },\n  {\n    \"name\": \"qty\",\n    \"type\": \"INTEGER\",\n    \"notnull\": false,\n    \"default_value\": null,\n    \"primary_key\": false\n  }\n]",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#7:write_query",
+      "tool": "write_query",
+      "args": {
+        "query": "UPDATE items SET qty = 4 WHERE name = 'anvil'"
+      },
+      "declared": {},
+      "response_text": "{\n  \"affected_rows\": 1\n}",
+      "effect_type": {
+        "value": "update",
+        "how": "observed",
+        "evidence": "observed 1 change(s): update items/1"
+      },
+      "targets": [
+        {
+          "store": "items",
+          "key": "1",
+          "op": "update"
+        }
+      ],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "call created no object to bear authority"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#8:write_query",
+      "tool": "write_query",
+      "args": {
+        "query": "DELETE FROM items WHERE name = 'rope'"
+      },
+      "declared": {},
+      "response_text": "{\n  \"affected_rows\": 1\n}",
+      "effect_type": {
+        "value": "delete",
+        "how": "observed",
+        "evidence": "observed 1 change(s): delete items/2"
+      },
+      "targets": [
+        {
+          "store": "items",
+          "key": "2",
+          "op": "delete"
+        }
+      ],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "call created no object to bear authority"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#9:append_insight",
+      "tool": "append_insight",
+      "args": {
+        "insight": "rope stock was removed"
+      },
+      "declared": {},
+      "response_text": "{\n  \"success\": true,\n  \"message\": \"Insight added\"\n}",
+      "effect_type": {
+        "value": "create",
+        "how": "observed",
+        "evidence": "observed 1 change(s): create mcp_insights/1"
+      },
+      "targets": [
+        {
+          "store": "mcp_insights",
+          "key": "1",
+          "op": "create"
+        }
+      ],
+      "persistence": {
+        "value": true,
+        "how": "observed",
+        "evidence": "mcp_insights/1 present in the final snapshot"
+      },
+      "authority_bearing": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": "probe inconclusive"
+      },
+      "created_via": "call#9:append_insight",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    },
+    {
+      "call_id": "call#10:list_insights",
+      "tool": "list_insights",
+      "args": {},
+      "declared": {},
+      "response_text": "[\n  {\n    \"id\": 1,\n    \"insight\": \"rope stock was removed\",\n    \"created_at\": \"2026-09-22 06:07:42\"\n  }\n]",
+      "effect_type": {
+        "value": "none",
+        "how": "observed",
+        "evidence": "no external object changed between before/after snapshots"
+      },
+      "targets": [],
+      "persistence": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "authority_bearing": {
+        "value": "no",
+        "how": "observed",
+        "evidence": "no object created"
+      },
+      "created_via": "",
+      "authorized_by": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "depends_on": {
+        "value": null,
+        "how": "unknown",
+        "evidence": ""
+      },
+      "effectiveness": {
+        "value": "unknown",
+        "how": "unknown",
+        "evidence": ""
+      }
+    }
+  ]
+}
