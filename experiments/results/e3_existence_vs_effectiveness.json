@@ -1,0 +1,110 @@
+{
+  "experiment": "E3_existence_vs_effectiveness",
+  "n_scenarios": 6,
+  "scenarios": [
+    {
+      "scenario": "no_event",
+      "description": "key minted under an active grant, nothing revoked",
+      "truth_effective": true,
+      "listed": true,
+      "grant_active": true,
+      "probe_status": "effective",
+      "probe_basis": "exercised api_keys.secret: server auth rule accepts it (status/expiry checked)",
+      "predictions": {
+        "existence": true,
+        "delegation_centric": true,
+        "probe": true
+      }
+    },
+    {
+      "scenario": "grant_revoked",
+      "description": "the authorizing grant is revoked; the key still works (residual authority)",
+      "truth_effective": true,
+      "listed": true,
+      "grant_active": false,
+      "probe_status": "effective",
+      "probe_basis": "exercised api_keys.secret: server auth rule accepts it (status/expiry checked)",
+      "predictions": {
+        "existence": true,
+        "delegation_centric": false,
+        "probe": true
+      }
+    },
+    {
+      "scenario": "key_revoked",
+      "description": "the key itself is revoked; it is still listed but dead",
+      "truth_effective": false,
+      "listed": true,
+      "grant_active": true,
+      "probe_status": "ineffective",
+      "probe_basis": "exercised api_keys.secret: server auth rule rejects it (status/expiry checked)",
+      "predictions": {
+        "existence": true,
+        "delegation_centric": true,
+        "probe": false
+      }
+    },
+    {
+      "scenario": "key_unlisted",
+      "description": "the key row is deleted; not listed and dead",
+      "truth_effective": false,
+      "listed": false,
+      "grant_active": true,
+      "probe_status": "ineffective",
+      "probe_basis": "object not listed; nothing to exercise",
+      "predictions": {
+        "existence": false,
+        "delegation_centric": true,
+        "probe": false
+      }
+    },
+    {
+      "scenario": "ttl_expired",
+      "description": "the key's TTL has passed; still listed but dead",
+      "truth_effective": false,
+      "listed": true,
+      "grant_active": true,
+      "probe_status": "ineffective",
+      "probe_basis": "exercised api_keys.secret: server auth rule rejects it (status/expiry checked)",
+      "predictions": {
+        "existence": true,
+        "delegation_centric": true,
+        "probe": false
+      }
+    },
+    {
+      "scenario": "grant_revoked_cascade",
+      "description": "grant revoked on a server that cascades; the key is dead",
+      "truth_effective": false,
+      "listed": true,
+      "grant_active": false,
+      "probe_status": "ineffective",
+      "probe_basis": "exercised api_keys.secret: server auth rule rejects it (status/expiry/grant checked)",
+      "predictions": {
+        "existence": true,
+        "delegation_centric": false,
+        "probe": false
+      }
+    }
+  ],
+  "scores": {
+    "existence": {
+      "correct": 3,
+      "false_effective": 3,
+      "false_ineffective": 0,
+      "accuracy": 0.5
+    },
+    "delegation_centric": {
+      "correct": 2,
+      "false_effective": 3,
+      "false_ineffective": 1,
+      "accuracy": 0.333
+    },
+    "probe": {
+      "correct": 6,
+      "false_effective": 0,
+      "false_ineffective": 0,
+      "accuracy": 1.0
+    }
+  }
+}

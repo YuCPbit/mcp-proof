@@ -1,0 +1,107 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>saas-testbed (honest) — effect evidence</title>
+<style>
+ :root{color-scheme:light;
+   --page:#faf9f7;--panel:#fff;--ink:#1b1a17;--ink-2:#514e47;--ink-3:#7d786d;
+   --line:#e4e1d8;--line-soft:#edeae2;
+   --accent:#4553c4;--accent-soft:rgba(69,83,196,.065);
+   --ok:#2f7d46;--warn:#a16207;--bad:#b3352e;--bad-tint:rgba(179,53,46,.06);
+   --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace}
+ *{box-sizing:border-box}
+ body{margin:0;background:var(--page);color:var(--ink);
+   font:14.5px/1.55 system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+ .wrap{max-width:1220px;margin:0 auto;padding:44px 24px 72px}
+ .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin:0 0 12px}
+ .eyebrow b{color:var(--ink-2);font-weight:600}
+ h1{font-size:30px;line-height:1.15;letter-spacing:-.02em;margin:0 0 12px;font-weight:650}
+ h2{font-size:19px;letter-spacing:-.01em;margin:36px 0 10px;font-weight:640}
+ .lede{color:var(--ink-2);margin:2px 0;font-size:14px}
+ .verdict{display:inline-flex;gap:8px;padding:4px 12px;border-radius:999px;font-weight:600;
+   font-size:13px;border:1px solid;margin:0 0 16px}
+ .verdict.pass{color:var(--ok);border-color:rgba(47,125,70,.45);background:rgba(47,125,70,.07)}
+ .verdict.warn{color:var(--warn);border-color:rgba(161,98,7,.45);background:rgba(161,98,7,.07)}
+ .verdict.fail{color:var(--bad);border-color:rgba(179,53,46,.45);background:var(--bad-tint)}
+ .scope{border:1px solid var(--line);border-radius:10px;background:var(--panel);
+   padding:12px 16px;font-size:13px;color:var(--ink-2);max-width:74em}
+ .scope b{color:var(--ink)}
+ .meta{display:flex;flex-wrap:wrap;font-size:13px;margin:18px 0 0;border-top:1px solid var(--line);
+   border-bottom:1px solid var(--line)}
+ .meta>div{padding:9px 24px 9px 0;margin-right:24px;border-right:1px solid var(--line-soft)}
+ .meta>div:last-child{border-right:0}
+ .meta .k{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3)}
+ .meta .v{font-family:var(--mono);font-size:13px}
+ .alert{border-left:2px solid var(--bad);padding:2px 0 2px 14px;margin:20px 0 0;font-size:13.5px;
+   max-width:74em}
+ .alert>b{color:var(--bad);display:block;font-size:11px;text-transform:uppercase;
+   letter-spacing:.09em;margin-bottom:4px}
+ .alert ul{margin:0;padding-left:18px} .alert li{margin:3px 0;color:var(--ink-2)}
+ .alert li b{color:var(--ink)}
+ .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+ table{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--panel)}
+ th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);
+   font-weight:600;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--page);
+   white-space:nowrap}
+ td{padding:8px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+ tr:last-child td{border-bottom:0}
+ tbody tr:hover>td{background:rgba(27,26,23,.022)}
+ .id,.mono{font-family:var(--mono);font-size:11.5px}
+ .lvl{color:var(--ink-3);font-size:11px}
+ .ttl{font-weight:550;font-size:13px} .ev{color:var(--ink-2);font-size:11.5px;margin-top:2px}
+ .fix{color:var(--ink-3);font-size:11.5px;margin-top:2px} .fix b{color:var(--ink-2)}
+ .tool{font-weight:600;font-size:13px} .args{color:var(--ink-3);margin-top:1px}
+ .resp{color:var(--ink-2);max-width:150px;word-break:break-word}
+ .badge{display:inline-flex;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;
+   border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+ .badge.pass{color:var(--ok);border-color:rgba(47,125,70,.4);background:rgba(47,125,70,.06)}
+ .badge.fail{color:var(--bad);border-color:rgba(179,53,46,.4);background:var(--bad-tint)}
+ .badge.warn{color:var(--warn);border-color:rgba(161,98,7,.4);background:rgba(161,98,7,.06)}
+ .badge.skip{color:var(--ink-3)}
+ .eff{display:inline-block;padding:0 7px;border-radius:999px;font-size:11px;font-weight:600;
+   border:1px solid var(--line);color:var(--ink-2)}
+ .eff.write{color:var(--warn);border-color:rgba(161,98,7,.4);background:rgba(161,98,7,.06)}
+ .auth-yes{color:var(--accent);font-weight:650;font-size:12.5px}
+ .auth-no{color:var(--ink-2);font-size:12.5px}
+ .how{display:inline-block;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;
+   padding:1px 5px;border-radius:4px;margin-left:3px;vertical-align:middle}
+ .how-observed{background:rgba(47,125,70,.1);color:var(--ok)}
+ .how-probed{background:var(--accent-soft);color:var(--accent)}
+ .how-declared{background:rgba(161,98,7,.1);color:var(--warn)}
+ .how-unknown{background:var(--line-soft);color:var(--ink-3)}
+ footer{margin-top:44px;padding-top:14px;border-top:1px solid var(--line);color:var(--ink-3);
+   font-size:12px}
+ @media (max-width:640px){h1{font-size:24px}.meta>div{padding-right:14px;margin-right:14px}}
+</style></head><body><div class="wrap">
+<p class="eyebrow"><b>mcp-proof</b> / effect evidence</p>
+<h1>saas-testbed (honest)</h1>
+<div class="verdict warn">1 advisory finding(s)</div>
+
+<div class="scope"><b>Observation boundary.</b> Effects are read <b>out-of-band</b> via an out-of-band SQLite read of the server&#x27;s state store,
+never from the tools' own responses. Authority and effectiveness come from a probe that
+<b>exercises</b> created objects: exercising each created credential against the server&#x27;s real auth rule. Dimensions no channel can establish are marked
+<span class="how how-unknown">unknown</span> and their checks SKIP — never a silent pass. This is a
+controlled measurement instrument; findings here are about the audited server, not production
+prevalence.</div>
+<div class="meta">
+ <div><span class="k">Calls observed</span><span class="v">10</span></div>
+ <div><span class="k">Authority objects</span><span class="v">3</span></div>
+</div>
+
+<h2>Effect-conformance checks</h2>
+<div class="tablewrap"><table>
+<thead><tr><th>Check</th><th>Level</th><th>Result</th><th>Details</th></tr></thead>
+<tbody><tr data-status="PASS"><td class="id">EFF-01</td><td class="lvl">MUST</td><td><span class="badge pass">✓ PASS</span></td><td><div class="ttl">readOnlyHint is honoured (no observed external write)</div><div class=ev>3 readOnly-annotated tool call(s) caused no observed external write</div></td></tr><tr data-status="PASS"><td class="id">EFF-02</td><td class="lvl">MUST</td><td><span class="badge pass">✓ PASS</span></td><td><div class="ttl">destructive effects are declared (observed delete ⇒ destructiveHint)</div><div class=ev>all 1 observed delete(s) came from destructiveHint-annotated tools</div></td></tr><tr data-status="SKIP"><td class="id">EFF-03</td><td class="lvl">SHOULD</td><td><span class="badge skip">– SKIP</span></td><td><div class="ttl">idempotentHint is honoured (a repeated identical call is a no-op)</div><div class=ev>no idempotentHint-annotated tool was called twice with identical arguments</div></td></tr><tr data-status="WARN"><td class="id">EFF-06</td><td class="lvl">SHOULD</td><td><span class="badge warn">! WARN</span></td><td><div class="ttl">created authority does not outlive its authorizing grant</div><div class=ev>create_api_key→api_keys/key_0001 authorized_by grant_root but depends_on nothing revocable (object not currently effective; no live dependency to probe); create_webhook→webhooks/wh_0001 authorized_by grant_root but depends_on [&#x27;self:webhooks:wh_0001&#x27;] (survives revoking grant:grant_root; revoking self:webhooks:wh_0001 disables it); create_share_link→share_links/share_0001 authorized_by grant_root but depends_on [&#x27;self:share_links:share_0001&#x27;] (survives revoking grant:grant_root; revoking self:share_links:share_0001 disables it)</div><div class=fix><b>Fix:</b> An object minted under a grant should stop working when that grant is revoked; a probe found it still effective, so revocation of the delegation will not disable it (residual authority).</div></td></tr></tbody></table></div>
+<h2>Per-call effect ledger</h2>
+<p class="lede">Declared annotations beside the effect an independent observer saw, the response a
+response-only auditor would have read, the objects that resulted, and the probe's authority /
+dependency verdict.</p>
+<div class="tablewrap"><table>
+<thead><tr><th>Call</th><th>Declared</th><th>Observed effect</th><th>Response seen</th>
+<th>Objects / persistence</th><th>Authority (probed)</th><th>Lineage</th></tr></thead>
+<tbody><tr><td><div class="tool">save_note</div><div class="args mono">{&quot;title&quot;: &quot;welcome&quot;, &quot;body&quot;: &quot;hello world&quot;}</div></td><td class="mono">—</td><td><span class="eff write">create</span> <span class="how how-observed">observed</span><div class="ev">observed 1 change(s): create notes/welcome</div></td><td class="mono resp">saved &#x27;welcome&#x27;</td><td>notes/welcome<div class="ev">ephemeral</div></td><td><span class="auth-no">not authority</span> <span class="how how-probed">probed</span><div class=ev>probe: notes rows carry no credential to exercise</div></td><td class="mono">by: grant_root<div class="ev">needs: —</div></td></tr><tr><td><div class="tool">ping</div><div class="args mono">{}</div></td><td class="mono">readOnlyHint=True</td><td><span class="eff read">none</span> <span class="how how-observed">observed</span><div class="ev">no external object changed between before/after snapshots</div></td><td class="mono resp">ok</td><td>—<div class="ev">—</div></td><td><span class="auth-no">not authority</span> <span class="how how-observed">observed</span><div class=ev>no object created</div></td><td class="mono">by: —<div class="ev">needs: —</div></td></tr><tr><td><div class="tool">list_notes</div><div class="args mono">{}</div></td><td class="mono">readOnlyHint=True</td><td><span class="eff read">none</span> <span class="how how-observed">observed</span><div class="ev">no external object changed between before/after snapshots</div></td><td class="mono resp">[&quot;welcome&quot;]</td><td>—<div class="ev">—</div></td><td><span class="auth-no">not authority</span> <span class="how how-observed">observed</span><div class=ev>no object created</div></td><td class="mono">by: —<div class="ev">needs: —</div></td></tr><tr><td><div class="tool">get_note</div><div class="args mono">{&quot;title&quot;: &quot;welcome&quot;}</div></td><td class="mono">readOnlyHint=True</td><td><span class="eff read">none</span> <span class="how how-observed">observed</span><div class="ev">no external object changed between before/after snapshots</div></td><td class="mono resp">hello world</td><td>—<div class="ev">—</div></td><td><span class="auth-no">not authority</span> <span class="how how-observed">observed</span><div class=ev>no object created</div></td><td class="mono">by: —<div class="ev">needs: —</div></td></tr><tr><td><div class="tool">create_api_key</div><div class="args mono">{&quot;label&quot;: &quot;ci&quot;}</div></td><td class="mono">—</td><td><span class="eff write">create</span> <span class="how how-observed">observed</span><div class="ev">observed 1 change(s): create api_keys/key_0001</div></td><td class="mono resp">{&quot;key_id&quot;: &quot;key_0001&quot;, &quot;secret&quot;: &quot;sk_test_bd24723ab694a02…</td><td>api_keys/key_0001<div class="ev">persistent</div></td><td><span class="auth-yes">authority-bearing</span> <span class="how how-probed">probed</span><div class=ev>probe: exercised api_keys.secret: server auth rule accepts it (status/expiry checked)</div></td><td class="mono">by: grant_root<div class="ev">needs: nothing revocable (residual)</div></td></tr><tr><td><div class="tool">create_webhook</div><div class="args mono">{&quot;url&quot;: &quot;https://example.com/hook&quot;}</div></td><td class="mono">—</td><td><span class="eff write">create</span> <span class="how how-observed">observed</span><div class="ev">observed 1 change(s): create webhooks/wh_0001</div></td><td class="mono resp">{&quot;webhook_id&quot;: &quot;wh_0001&quot;, &quot;secret&quot;: &quot;sk_test_fcbfb6a77963…</td><td>webhooks/wh_0001<div class="ev">persistent</div></td><td><span class="auth-yes">authority-bearing</span> <span class="how how-probed">probed</span><div class=ev>probe: exercised webhooks.secret: server auth rule accepts it (status/expiry checked)</div></td><td class="mono">by: grant_root<div class="ev">needs: self:webhooks:wh_0001</div></td></tr><tr><td><div class="tool">create_share_link</div><div class="args mono">{&quot;title&quot;: &quot;welcome&quot;}</div></td><td class="mono">—</td><td><span class="eff write">create</span> <span class="how how-observed">observed</span><div class="ev">observed 1 change(s): create share_links/share_0001</div></td><td class="mono resp">{&quot;share_id&quot;: &quot;share_0001&quot;, &quot;token&quot;: &quot;sk_test_9268f02577b5…</td><td>share_links/share_0001<div class="ev">persistent</div></td><td><span class="auth-yes">authority-bearing</span> <span class="how how-probed">probed</span><div class=ev>probe: exercised share_links.token: server auth rule accepts it (status/expiry checked)</div></td><td class="mono">by: grant_root<div class="ev">needs: self:share_links:share_0001</div></td></tr><tr><td><div class="tool">revoke_api_key</div><div class="args mono">{&quot;key_id&quot;: &quot;key_0001&quot;}</div></td><td class="mono">destructiveHint=True</td><td><span class="eff write">update</span> <span class="how how-observed">observed</span><div class="ev">observed 1 change(s): update api_keys/key_0001</div></td><td class="mono resp">revoked 1 key(s)</td><td>api_keys/key_0001<div class="ev">—</div></td><td><span class="auth-no">not authority</span> <span class="how how-observed">observed</span><div class=ev>call created no object to bear authority</div></td><td class="mono">by: —<div class="ev">needs: —</div></td></tr><tr><td><div class="tool">cleanup_notes</div><div class="args mono">{}</div></td><td class="mono">destructiveHint=True</td><td><span class="eff read">none</span> <span class="how how-observed">observed</span><div class="ev">no external object changed between before/after snapshots</div></td><td class="mono resp">cleaned 0 temp note(s)</td><td>—<div class="ev">—</div></td><td><span class="auth-no">not authority</span> <span class="how how-observed">observed</span><div class=ev>no object created</div></td><td class="mono">by: —<div class="ev">needs: —</div></td></tr><tr><td><div class="tool">delete_note</div><div class="args mono">{&quot;title&quot;: &quot;welcome&quot;}</div></td><td class="mono">destructiveHint=True</td><td><span class="eff write">delete</span> <span class="how how-observed">observed</span><div class="ev">observed 1 change(s): delete notes/welcome</div></td><td class="mono resp">deleted 1 note(s)</td><td>notes/welcome<div class="ev">—</div></td><td><span class="auth-no">not authority</span> <span class="how how-observed">observed</span><div class=ev>call created no object to bear authority</div></td><td class="mono">by: —<div class="ev">needs: —</div></td></tr></tbody></table></div>
+<footer>mcp-proof effect lane · deterministic, out-of-band observation · no LLM judging.
+<b>how-known</b>: <span class="how how-observed">observed</span> (state diff)
+<span class="how how-probed">probed</span> (exercised)
+<span class="how how-declared">declared</span> (server's word)
+<span class="how how-unknown">unknown</span> (no channel).</footer>
+</div></body></html>

@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - "demo/**"
+      - "experiments/results/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -34,7 +35,10 @@ jobs:
           cp demo/report-*.pdf _site/ 2>/dev/null || true
           cp demo/report-filesystem.png demo/architecture.svg _site/ 2>/dev/null || true
           cp demo/pages-index.html _site/index.html
-          ls -la _site/
+          # research evaluation site (experiment results, effect-evidence reports, raw JSON/MD)
+          mkdir -p _site/evaluation
+          cp experiments/results/*.html experiments/results/*.json experiments/results/*.md _site/evaluation/
+          ls -laR _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

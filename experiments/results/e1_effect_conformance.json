@@ -1,0 +1,176 @@
+{
+  "experiment": "E1_declared_vs_observed_effect",
+  "variants": [
+    {
+      "variant": "honest",
+      "positives": [],
+      "flagged": {
+        "effect_aware": [],
+        "response_level": [],
+        "name_heuristic": []
+      }
+    },
+    {
+      "variant": "lie-readonly",
+      "positives": [
+        "save_note"
+      ],
+      "flagged": {
+        "effect_aware": [
+          "save_note"
+        ],
+        "response_level": [
+          "save_note"
+        ],
+        "name_heuristic": []
+      }
+    },
+    {
+      "variant": "hide-destructive",
+      "positives": [
+        "delete_note"
+      ],
+      "flagged": {
+        "effect_aware": [
+          "delete_note"
+        ],
+        "response_level": [
+          "delete_note"
+        ],
+        "name_heuristic": [
+          "delete_note"
+        ]
+      }
+    },
+    {
+      "variant": "webhook-readonly",
+      "positives": [
+        "create_webhook"
+      ],
+      "flagged": {
+        "effect_aware": [
+          "create_webhook"
+        ],
+        "response_level": [],
+        "name_heuristic": [
+          "create_webhook"
+        ]
+      }
+    },
+    {
+      "variant": "silent-keymint",
+      "positives": [
+        "get_note"
+      ],
+      "flagged": {
+        "effect_aware": [
+          "get_note"
+        ],
+        "response_level": [],
+        "name_heuristic": []
+      }
+    },
+    {
+      "variant": "shadow-webhook",
+      "positives": [
+        "list_notes"
+      ],
+      "flagged": {
+        "effect_aware": [
+          "list_notes"
+        ],
+        "response_level": [],
+        "name_heuristic": []
+      }
+    },
+    {
+      "variant": "phantom-write",
+      "positives": [
+        "ping"
+      ],
+      "flagged": {
+        "effect_aware": [
+          "ping"
+        ],
+        "response_level": [],
+        "name_heuristic": []
+      }
+    }
+  ],
+  "catch_table": {
+    "lie-readonly": {
+      "tool": "save_note",
+      "response_invisible": false,
+      "caught_by": [
+        "effect_aware",
+        "response_level"
+      ]
+    },
+    "hide-destructive": {
+      "tool": "delete_note",
+      "response_invisible": false,
+      "caught_by": [
+        "effect_aware",
+        "response_level",
+        "name_heuristic"
+      ]
+    },
+    "webhook-readonly": {
+      "tool": "create_webhook",
+      "response_invisible": false,
+      "caught_by": [
+        "effect_aware",
+        "name_heuristic"
+      ]
+    },
+    "silent-keymint": {
+      "tool": "get_note",
+      "response_invisible": true,
+      "caught_by": [
+        "effect_aware"
+      ]
+    },
+    "shadow-webhook": {
+      "tool": "list_notes",
+      "response_invisible": true,
+      "caught_by": [
+        "effect_aware"
+      ]
+    },
+    "phantom-write": {
+      "tool": "ping",
+      "response_invisible": true,
+      "caught_by": [
+        "effect_aware"
+      ]
+    }
+  },
+  "scores": {
+    "effect_aware": {
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "response_level": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 4,
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5
+    },
+    "name_heuristic": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 4,
+      "precision": 1.0,
+      "recall": 0.333,
+      "f1": 0.5
+    }
+  },
+  "n_tools_per_variant": 10,
+  "n_variants": 7
+}

@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Effect-aware conformance — mcp-proof evaluation</title>
+<style>
+:root{
+  --page:#faf9f7; --panel:#ffffff; --ink:#1b1a17; --ink-2:#514e47; --ink-3:#7d786d;
+  --line:#e4e1d8; --line-soft:#edeae2;
+  --accent:#4553c4; --accent-soft:rgba(69,83,196,.065); --accent-line:rgba(69,83,196,.35);
+  --ok:#2f7d46; --warn:#a16207; --bad:#b3352e;
+  --bad-tint:rgba(179,53,46,.07); --note-tint:rgba(161,98,7,.06);
+  --mono:ui-monospace,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 var(--sans);
+     -webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code,.mono{font-family:var(--mono)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.shell{max-width:1220px;margin:0 auto;padding:0 24px 96px;display:grid;
+       grid-template-columns:176px minmax(0,1fr);gap:48px}
+main{min-width:0;max-width:960px}
+
+/* ------------------------------------------------------------- nav rail */
+.rail{padding-top:56px}
+.rail nav{position:sticky;top:28px;font-size:13px}
+.rail .rail-mark{font-weight:650;letter-spacing:-.01em;margin-bottom:14px;color:var(--ink)}
+.rail .rail-mark .sep{color:var(--ink-3);font-weight:400}
+.rail a{display:block;padding:5px 0 5px 12px;color:var(--ink-2);border-left:2px solid transparent;
+        line-height:1.35}
+.rail a .eid{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-right:6px}
+.rail a:hover{color:var(--ink);text-decoration:none}
+.rail a[aria-current]{border-left-color:var(--accent);color:var(--ink)}
+.rail a[aria-current] .eid{color:var(--accent)}
+
+/* --------------------------------------------------------------- header */
+header.doc{padding:56px 0 8px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+         margin:0 0 14px}
+.eyebrow b{color:var(--ink-2);font-weight:600}
+h1{font-size:38px;line-height:1.12;letter-spacing:-.022em;margin:0 0 10px;font-weight:650}
+.question{font-size:17px;color:var(--ink-2);margin:0 0 14px;max-width:52em}
+.lede{font-size:15px;color:var(--ink-2);margin:0;max-width:56em}
+
+.metastrip{display:flex;flex-wrap:wrap;gap:0;margin:26px 0 0;border-top:1px solid var(--line);
+           border-bottom:1px solid var(--line);font-size:13px}
+.metastrip>div{padding:10px 26px 10px 0;margin-right:26px;border-right:1px solid var(--line-soft)}
+.metastrip>div:last-child{border-right:0;margin-right:0}
+.metastrip .k{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+              color:var(--ink-3);margin-bottom:1px}
+.metastrip .v{font-family:var(--mono);font-size:13px;color:var(--ink)}
+.disclaimer{font-size:12.5px;color:var(--ink-3);margin:10px 0 0}
+.artifacts{font-size:12.5px;color:var(--ink-3);margin:6px 0 0}
+.artifacts a{font-family:var(--mono);font-size:12px;margin-right:14px}
+
+/* ---------------------------------------------------------- experiments */
+section.exp{margin-top:64px;padding-top:28px;border-top:1px solid var(--line)}
+.exp-head{display:flex;align-items:baseline;gap:12px;margin:0 0 4px}
+.exp-head .eid{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600}
+.exp-head h2{font-size:25px;letter-spacing:-.015em;font-weight:640;margin:0}
+.exp-head .anchor{color:var(--line);font-size:15px;visibility:hidden}
+.exp-head:hover .anchor{visibility:visible}
+.rq{margin:10px 0 0;max-width:54em}
+.label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.09em;
+       color:var(--ink-3);margin-bottom:3px}
+.rq p{margin:0;font-size:15.5px;color:var(--ink-2)}
+
+.finding{margin:18px 0 0;padding:2px 0 2px 14px;border-left:2px solid var(--accent);max-width:54em}
+.finding p{margin:0;font-size:16px;color:var(--ink)}
+.finding .label{color:var(--accent);opacity:.85}
+
+.viz{margin:22px 0 0}
+.method{font-size:12.5px;color:var(--ink-3);margin:14px 0 0;max-width:60em}
+.method b{color:var(--ink-2);font-weight:600}
+
+/* ----------------------------------------------------------- tables ----*/
+.tablewrap{overflow-x:auto;margin:0;border:1px solid var(--line);border-radius:10px;
+           background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;background:var(--panel)}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);
+   font-weight:600;text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);
+   white-space:nowrap;background:var(--page)}
+th.num,td.num{text-align:right}
+td{padding:8px 14px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td .sub{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.id{font-family:var(--mono);font-size:12.5px;white-space:nowrap;cursor:copy}
+.id:hover{color:var(--accent)}
+.id.copied{color:var(--ok)}
+.val{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+tr.hl-accent>td{background:var(--accent-soft)}
+tr.hl-accent>td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
+tr.hl-note>td{background:var(--note-tint)}
+tr.hl-note>td:first-child{box-shadow:inset 2px 0 0 var(--warn)}
+tr.group>td{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);
+            background:var(--page);padding:5px 14px;border-bottom:1px solid var(--line-soft)}
+td.err{background:var(--bad-tint)}
+.note-cell{font-size:12.5px;color:var(--ink-2)}
+tbody tr:hover>td{background:rgba(27,26,23,.022)}
+tbody tr.hl-accent:hover>td{background:var(--accent-soft)}
+tbody tr.hl-note:hover>td{background:var(--note-tint)}
+
+/* metric micro-bars */
+.mrow{display:flex;align-items:center;gap:10px;justify-content:flex-end}
+.bar{flex:none;width:76px;height:4px;background:var(--line-soft);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ink-3);border-radius:2px}
+tr.hl-accent .bar i{background:var(--accent)}
+
+/* status dots */
+.dot{font-size:12px;line-height:1}
+.dot.on{color:var(--ink)} .dot.off{color:var(--ink-3)}
+.dot.ok{color:var(--ok)} .dot.bad{color:var(--bad)}
+.dotlbl{font-size:11.5px;color:var(--ink-3);margin-left:5px}
+.legend{font-size:12px;color:var(--ink-3);margin:8px 2px 0}
+.legend .dot{margin-left:10px;margin-right:2px}
+.legend .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;
+                background:var(--bad-tint);border:1px solid var(--line);
+                vertical-align:-2px;margin:0 4px 0 12px}
+
+.badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;
+       padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2)}
+.badge.bad{color:var(--bad);border-color:rgba(179,53,46,.4);background:var(--bad-tint)}
+.badge.inv{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+
+/* evidence disclosure */
+details.evidence{margin:16px 0 0;border:1px solid var(--line);background:var(--panel);
+                 border-radius:10px;overflow:hidden}
+details.evidence .tablewrap{border:0;border-radius:0}
+details.evidence>summary{cursor:pointer;list-style:none;padding:9px 14px;font-size:13px;
+                         color:var(--ink-2);display:flex;align-items:center;gap:8px;
+                         user-select:none}
+details.evidence>summary::-webkit-details-marker{display:none}
+details.evidence>summary:before{content:"+";font-family:var(--mono);color:var(--ink-3);
+                                width:12px;text-align:center}
+details.evidence[open]>summary:before{content:"−"}
+details.evidence[open]>summary{border-bottom:1px solid var(--line-soft)}
+details.evidence .inner{padding:0}
+details.evidence table{border:0}
+details.evidence .method{padding:10px 14px;margin:0}
+
+/* footer */
+footer.doc{margin-top:72px;padding-top:18px;border-top:1px solid var(--line);
+           font-size:12.5px;color:var(--ink-3)}
+footer.doc code{font-size:12px;background:var(--panel);border:1px solid var(--line-soft);
+                padding:1px 5px;border-radius:4px}
+
+@media (max-width:1080px){
+  html{scroll-padding-top:64px}
+  .shell{display:block;padding:0 18px 72px}
+  .rail{padding:0;margin:0 -18px}
+  .rail nav{position:sticky;top:0;display:flex;align-items:center;gap:2px;overflow-x:auto;
+            background:var(--page);border-bottom:1px solid var(--line);padding:10px 18px;
+            z-index:10}
+  .rail .rail-mark{margin:0 14px 0 0;white-space:nowrap;font-size:13px}
+  .rail a{border-left:0;border-bottom:2px solid transparent;padding:2px 8px;white-space:nowrap}
+  .rail a[aria-current]{border-bottom-color:var(--accent)}
+  header.doc{padding-top:34px}
+  h1{font-size:30px}
+  .metastrip>div{padding-right:16px;margin-right:16px}
+}
+@media (max-width:640px){
+  h1{font-size:26px}
+  .metastrip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+  .metastrip>div{border-right:0;padding:8px 0;margin:0;min-width:0}
+  .metastrip .v{white-space:normal;overflow-wrap:anywhere}
+  .artifacts a{overflow-wrap:anywhere}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="rail"><nav aria-label="experiments"><div class="rail-mark">mcp-proof <span class="sep">/</span> evaluation</div><a href="#overview">Overview</a><a href="#e1"><span class=eid>E1</span>Annotation lies</a><a href="#e2"><span class=eid>E2</span>Persistence vs authority</a><a href="#e3"><span class=eid>E3</span>Effectiveness</a><a href="#method">Method</a></nav></aside>
+<main>
+
+<header class="doc" id="overview" data-spy>
+  <p class="eyebrow"><b>mcp-proof</b> / evaluation</p>
+  <h1>Effect-aware conformance</h1>
+  <p class="question">Can declared MCP effects be verified against independently observed
+  external state?</p>
+  <p class="lede">Declared MCP semantics can be misleading even when tool responses and tool
+  names look correct. Each experiment compares a declared or inferred property against ground
+  truth established outside the audited MCP surface — an out-of-band state observer and a
+  probe that exercises created objects.</p>
+  
+<div class="metastrip" role="list">
+  <div role="listitem"><span class="k">Testbed</span>
+    <span class="v">controlled · synthetic</span></div>
+  <div role="listitem"><span class="k">Ground truth</span>
+    <span class="v">out-of-band state</span></div>
+  <div role="listitem"><span class="k">Experiments</span>
+    <span class="v">3 · 3 detectors each</span></div>
+  <div role="listitem"><span class="k">Planted lies</span>
+    <span class="v">6 (3 response-invisible)</span></div>
+</div>
+<p class="disclaimer">Controlled-testbed measurements of detection behaviour on planted
+inconsistencies — not production prevalence. Ground truth is read out-of-band from the state
+store, never through the audited MCP surface.</p>
+<p class="artifacts">Artifacts:
+  <a href="effect-report-honest.html">effect-report-honest.html</a>
+  <a href="effect-report-silent-keymint.html">effect-report-silent-keymint.html</a>
+  <a href="summary.md">summary.md</a>
+  <a href="e1_effect_conformance.json">e1.json</a>
+  <a href="e2_persistence_vs_authority.json">e2.json</a>
+  <a href="e3_existence_vs_effectiveness.json">e3.json</a>
+</p>
+</header>
+
+<section class="exp" id="e1" data-spy>
+  <div class="exp-head"><span class="eid">E1</span><h2>Declared effect vs observed effect</h2>
+    <a class="anchor" href="#e1" aria-label="link to E1">#</a></div>
+  <div class="rq"><span class="label">Research question</span><p>Can effect observation catch annotation lies that a response-only auditor and a name heuristic miss?</p></div>
+  <div class="finding"><span class="label">Finding</span><p>Only effect observation detects all three response-invisible lies. Each baseline reaches recall 0.333 with a structural blind spot the observation channel cannot fix.</p></div>
+  <div class="viz"><div class="tablewrap"><table><thead><tr><th>Detector</th><th class=num>Precision</th><th class=num>Recall</th><th class=num>F1</th></tr></thead><tbody><tr class="hl-accent"><td><span>Effect-aware</span><span class="sub">out-of-band state observation · <span class="val">TP 6 · FP 0 · FN 0</span></span></td><td class="num"><span class="val">1.000</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:100%"></i></span><span class="val">1.000</span></span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:100%"></i></span><span class="val">1.000</span></span></td></tr><tr><td><span>Response-level</span><span class="sub">tool responses only (current auditor) · <span class="val">TP 2 · FP 0 · FN 4</span></span></td><td class="num"><span class="val">1.000</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:33%"></i></span><span class="val">0.333</span></span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:50%"></i></span><span class="val">0.500</span></span></td></tr><tr><td><span>Name heuristic</span><span class="sub">tool names/descriptions only · <span class="val">TP 2 · FP 0 · FN 4</span></span></td><td class="num"><span class="val">1.000</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:33%"></i></span><span class="val">0.333</span></span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:50%"></i></span><span class="val">0.500</span></span></td></tr></tbody></table></div><p class="legend" style="margin-bottom:14px">aggregated over the honest server + six single-lie variants; per-lie detections below</p><div class="tablewrap"><table><thead><tr><th>Planted lie</th><th>Lying tool</th><th>Effect-aware</th><th>Response-level</th><th>Name heuristic</th></tr></thead><tbody><tr class="group"><td colspan="5">effect visible in the response</td></tr><tr><td><code class="id" data-copy="lie-readonly">lie-readonly</code></td><td><code class="id" data-copy="save_note">save_note</code></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">missed</span></td></tr><tr><td><code class="id" data-copy="hide-destructive">hide-destructive</code></td><td><code class="id" data-copy="delete_note">delete_note</code></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td></tr><tr><td><code class="id" data-copy="webhook-readonly">webhook-readonly</code></td><td><code class="id" data-copy="create_webhook">create_webhook</code></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">missed</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td></tr><tr class="group"><td colspan="5">effect invisible in the response — only observation can see it</td></tr><tr class="hl-accent"><td><code class="id" data-copy="silent-keymint">silent-keymint</code></td><td><code class="id" data-copy="get_note">get_note</code></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">missed</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">missed</span></td></tr><tr class="hl-accent"><td><code class="id" data-copy="shadow-webhook">shadow-webhook</code></td><td><code class="id" data-copy="list_notes">list_notes</code></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">missed</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">missed</span></td></tr><tr class="hl-accent"><td><code class="id" data-copy="phantom-write">phantom-write</code></td><td><code class="id" data-copy="ping">ping</code></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">caught</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">missed</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">missed</span></td></tr></tbody></table></div><p class="legend"><span class="dot ok">●</span> caught<span class="dot off">○</span> missed — highlighted rows are the three response-invisible lies</p></div>
+  <details class="evidence"><summary>Inspect evidence — per-variant detections</summary><div class="inner"><div class="tablewrap"><table><thead><tr><th>Server variant</th><th>Ground truth (lying tool)</th><th>Effect-aware flagged</th><th>Response-level flagged</th><th>Name heuristic flagged</th></tr></thead><tbody><tr><td><code class="id" data-copy="honest">honest</code></td><td><span class="dot off">—</span></td><td><span class="dot off">—</span></td><td><span class="dot off">—</span></td><td><span class="dot off">—</span></td></tr><tr><td><code class="id" data-copy="lie-readonly">lie-readonly</code></td><td><code class="id" data-copy="save_note">save_note</code></td><td><code class="id" data-copy="save_note">save_note</code></td><td><code class="id" data-copy="save_note">save_note</code></td><td><span class="dot off">—</span></td></tr><tr><td><code class="id" data-copy="hide-destructive">hide-destructive</code></td><td><code class="id" data-copy="delete_note">delete_note</code></td><td><code class="id" data-copy="delete_note">delete_note</code></td><td><code class="id" data-copy="delete_note">delete_note</code></td><td><code class="id" data-copy="delete_note">delete_note</code></td></tr><tr><td><code class="id" data-copy="webhook-readonly">webhook-readonly</code></td><td><code class="id" data-copy="create_webhook">create_webhook</code></td><td><code class="id" data-copy="create_webhook">create_webhook</code></td><td><span class="dot off">—</span></td><td><code class="id" data-copy="create_webhook">create_webhook</code></td></tr><tr><td><code class="id" data-copy="silent-keymint">silent-keymint</code></td><td><code class="id" data-copy="get_note">get_note</code></td><td><code class="id" data-copy="get_note">get_note</code></td><td><span class="dot off">—</span></td><td><span class="dot off">—</span></td></tr><tr><td><code class="id" data-copy="shadow-webhook">shadow-webhook</code></td><td><code class="id" data-copy="list_notes">list_notes</code></td><td><code class="id" data-copy="list_notes">list_notes</code></td><td><span class="dot off">—</span></td><td><span class="dot off">—</span></td></tr><tr><td><code class="id" data-copy="phantom-write">phantom-write</code></td><td><code class="id" data-copy="ping">ping</code></td><td><code class="id" data-copy="ping">ping</code></td><td><span class="dot off">—</span></td><td><span class="dot off">—</span></td></tr></tbody></table></div><p class="method">One audit per variant; every detector reads the same execution, so differences come from the observation channel, not from run-to-run noise. The honest variant measures false positives — no detector flagged anything on it.</p></div></details>
+  <p class="method"><b>Oracle:</b> the testbed's mutation ledger — each variant plants exactly one annotation lie in one tool. <b>Fairness:</b> all three detectors read the same execution records; they differ only in which channel they may consult (external state, response text, or metadata).</p>
+</section>
+
+<section class="exp" id="e2" data-spy>
+  <div class="exp-head"><span class="eid">E2</span><h2>Persistence is not authority</h2>
+    <a class="anchor" href="#e2" aria-label="link to E2">#</a></div>
+  <div class="rq"><span class="label">Research question</span><p>Does probe-backed classification separate authority-bearing objects from ordinary persistent objects better than “persistent ⇒ authority” and a credential-name keyword?</p></div>
+  <div class="finding"><span class="label">Finding</span><p>The probe classifies by <em>use</em>, not appearance — it is correct on the decoy note named <code>api_key_backup</code> (fools both baselines' signals) and on a credential that never persisted.</p></div>
+  <div class="viz"><div class="tablewrap"><table><thead><tr><th>Classifier</th><th class=num>Accuracy</th><th class=num>TP</th><th class=num>FP</th><th class=num>TN</th><th class=num>FN</th></tr></thead><tbody><tr class="hl-accent"><td><span>Probe (exercise)</span><span class="sub">attempts to use the object</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:100%"></i></span><span class="val">1.000</span></span></td><td class="num"><span class="val">5</span></td><td class="num"><span class="val">0</span></td><td class="num"><span class="val">3</span></td><td class="num"><span class="val">0</span></td></tr><tr><td><span>Name keyword</span><span class="sub">credential-looking names count as authority</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:88%"></i></span><span class="val">0.875</span></span></td><td class="num"><span class="val">5</span></td><td class="num"><span class="val">1</span></td><td class="num"><span class="val">2</span></td><td class="num"><span class="val">0</span></td></tr><tr><td><span>Persistence ⇒ authority</span><span class="sub">persistent objects count as authority</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:62%"></i></span><span class="val">0.625</span></span></td><td class="num"><span class="val">4</span></td><td class="num"><span class="val">2</span></td><td class="num"><span class="val">1</span></td><td class="num"><span class="val">1</span></td></tr></tbody></table></div><p class="legend" style="margin-bottom:14px">object corpus spans the persistent × authority quadrants; per-object classifications below</p><div class="tablewrap"><table><thead><tr><th>Object</th><th>Persistent</th><th>Authority (truth)</th><th>Persistence says</th><th>Name says</th><th>Probe says</th><th>Note</th></tr></thead><tbody><tr><td><code class="id" data-copy="api_keys/key_0001">api_keys/key_0001</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td class="note-cell">—</td></tr><tr><td><code class="id" data-copy="api_keys/key_0002">api_keys/key_0002</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td class="note-cell">—</td></tr><tr><td><code class="id" data-copy="webhooks/wh_0001">webhooks/wh_0001</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td class="note-cell">—</td></tr><tr><td><code class="id" data-copy="share_links/share_0001">share_links/share_0001</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td class="note-cell">—</td></tr><tr><td><code class="id" data-copy="notes/welcome">notes/welcome</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span> <span class="sr">(disagrees with ground truth)</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td class="note-cell">—</td></tr><tr class="hl-note"><td><code class="id" data-copy="notes/api_key_backup">notes/api_key_backup</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span> <span class="sr">(disagrees with ground truth)</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span> <span class="sr">(disagrees with ground truth)</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td class="note-cell">decoy: credential-looking note name</td></tr><tr class="hl-note"><td><code class="id" data-copy="notes/scratch">notes/scratch</code></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td class="note-cell">ephemeral note (created, then deleted in-plan)</td></tr><tr class="hl-note"><td><code class="id" data-copy="api_keys/key_0003">api_keys/key_0003</code></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td class="err"><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">false</span> <span class="sr">(disagrees with ground truth)</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">true</span></td><td class="note-cell">counterexample: credential minted then removed out-of-band — authority without persistence</td></tr></tbody></table></div><p class="legend"><span class="dot on">●</span> true<span class="dot off">○</span> false<span class="swatch"></span> prediction disagrees with ground truth</p></div>
+  
+  <p class="method"><b>Oracle:</b> by-construction authority labels — a table's objects are authority-bearing iff the testbed's real authorization rule accepts them as credentials. <b>Probing time:</b> each object is exercised at creation time, while it genuinely exists; persistence is judged against the final snapshot.</p>
+</section>
+
+<section class="exp" id="e3" data-spy>
+  <div class="exp-head"><span class="eid">E3</span><h2>Existence is not current effectiveness</h2>
+    <a class="anchor" href="#e3" aria-label="link to E3">#</a></div>
+  <div class="rq"><span class="label">Research question</span><p>After a lifecycle event (grant revoked, key revoked, key deleted, TTL expired), does an exercise probe report an object's true effectiveness where “it is still listed” and “its grant is still active” do not?</p></div>
+  <div class="finding"><span class="label">Finding</span><p>In <code>grant_revoked</code> the key remains effective although the grant that authorized it is gone — residual authority. The delegation-centric view calls it dead (the one false-ineffective); the probe does not, and existence never distinguishes a live key from a listed-but-dead one.</p></div>
+  <div class="viz"><div class="tablewrap"><table><thead><tr><th>Detector</th><th class=num>Accuracy</th><th class=num>False-effective</th><th class=num>False-ineffective</th></tr></thead><tbody><tr class="hl-accent"><td><span>Probe (exercise)</span><span class="sub">attempts to use the object</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:100%"></i></span><span class="val">1.000</span></span></td><td class="num"><span class="val">0</span></td><td class="num"><span class="val">0</span></td></tr><tr><td><span>Existence (inventory)</span><span class="sub">listed ⇒ effective</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:50%"></i></span><span class="val">0.500</span></span></td><td class="num"><span class="val">3</span></td><td class="num"><span class="val">0</span></td></tr><tr><td><span>Delegation-centric</span><span class="sub">grant active ⇒ effective</span></td><td class="num"><span class="mrow"><span class="bar"><i style="width:33%"></i></span><span class="val">0.333</span></span></td><td class="num"><span class="val">3</span></td><td class="num"><span class="badge bad">1 — residual authority missed</span></td></tr></tbody></table></div><p class="legend" style="margin-bottom:14px">false-ineffective is the dangerous error: believing an object is neutralized while it still works</p><div class="tablewrap"><table><thead><tr><th>Lifecycle scenario</th><th>Truth</th><th>Existence says</th><th>Delegation says</th><th>Probe says</th><th>Note</th></tr></thead><tbody><tr><td><code class="id" data-copy="no_event">no_event</code></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">effective</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span></td><td class="note-cell">key minted under an active grant, nothing revoked</td></tr><tr class="hl-accent"><td><code class="id" data-copy="grant_revoked">grant_revoked</code></td><td><span class="dot ok" aria-hidden="true">●</span><span class="dotlbl">effective</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span></td><td class="err"><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span> <span class="sr">(disagrees with ground truth)</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span></td><td class="note-cell">the authorizing grant is revoked; the key still works (residual authority) <span class="badge inv">residual authority</span></td></tr><tr><td><code class="id" data-copy="key_revoked">key_revoked</code></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span> <span class="sr">(disagrees with ground truth)</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span> <span class="sr">(disagrees with ground truth)</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td class="note-cell">the key itself is revoked; it is still listed but dead</td></tr><tr><td><code class="id" data-copy="key_unlisted">key_unlisted</code></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span> <span class="sr">(disagrees with ground truth)</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td class="note-cell">the key row is deleted; not listed and dead</td></tr><tr><td><code class="id" data-copy="ttl_expired">ttl_expired</code></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span> <span class="sr">(disagrees with ground truth)</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span> <span class="sr">(disagrees with ground truth)</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td class="note-cell">the key's TTL has passed; still listed but dead</td></tr><tr><td><code class="id" data-copy="grant_revoked_cascade">grant_revoked_cascade</code></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td class="err"><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">effective</span> <span class="sr">(disagrees with ground truth)</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">dead</span></td><td class="note-cell">grant revoked on a server that cascades; the key is dead</td></tr></tbody></table></div><p class="legend"><span class="dot ok">●</span> effective<span class="dot off">○</span> dead<span class="swatch"></span> prediction disagrees with ground truth</p></div>
+  <details class="evidence"><summary>Inspect evidence — per-scenario probe transcript</summary><div class="inner"><div class="tablewrap"><table><thead><tr><th>Scenario</th><th>Key row</th><th>Grant</th><th>Probe status</th><th>Probe basis</th></tr></thead><tbody><tr><td><code class="id" data-copy="no_event">no_event</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">listed</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">active</span></td><td><span class="val">effective</span></td><td class="note-cell mono" style="font-size:12px">exercised api_keys.secret: server auth rule accepts it (status/expiry checked)</td></tr><tr><td><code class="id" data-copy="grant_revoked">grant_revoked</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">listed</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">revoked</span></td><td><span class="val">effective</span></td><td class="note-cell mono" style="font-size:12px">exercised api_keys.secret: server auth rule accepts it (status/expiry checked)</td></tr><tr><td><code class="id" data-copy="key_revoked">key_revoked</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">listed</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">active</span></td><td><span class="val">ineffective</span></td><td class="note-cell mono" style="font-size:12px">exercised api_keys.secret: server auth rule rejects it (status/expiry checked)</td></tr><tr><td><code class="id" data-copy="key_unlisted">key_unlisted</code></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">absent</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">active</span></td><td><span class="val">ineffective</span></td><td class="note-cell mono" style="font-size:12px">object not listed; nothing to exercise</td></tr><tr><td><code class="id" data-copy="ttl_expired">ttl_expired</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">listed</span></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">active</span></td><td><span class="val">ineffective</span></td><td class="note-cell mono" style="font-size:12px">exercised api_keys.secret: server auth rule rejects it (status/expiry checked)</td></tr><tr><td><code class="id" data-copy="grant_revoked_cascade">grant_revoked_cascade</code></td><td><span class="dot on" aria-hidden="true">●</span><span class="dotlbl">listed</span></td><td><span class="dot off" aria-hidden="true">○</span><span class="dotlbl">revoked</span></td><td><span class="val">ineffective</span></td><td class="note-cell mono" style="font-size:12px">exercised api_keys.secret: server auth rule rejects it (status/expiry/grant checked)</td></tr></tbody></table></div><p class="method">The probe basis is the evidence line the exercise probe recorded: which credential column it exercised and which rule accepted or rejected it. The key is <code>api_keys/key_0001</code> in every scenario; each scenario runs on a fresh server.</p></div></details>
+  <p class="method"><b>Oracle:</b> intended effectiveness per scenario, by construction — modelled on documented provider behaviour (a revoked grant leaving a minted key alive; keys listed after revocation). <b>Event application:</b> lifecycle events are applied out-of-band, never through the audited tools.</p>
+</section>
+
+<section class="exp" id="method" data-spy>
+  <div class="exp-head"><h2>Method &amp; reproduction</h2>
+    <a class="anchor" href="#method" aria-label="link to method">#</a></div>
+  <div class="rq" style="max-width:60em"><p>
+  Every number on this page is read from the experiment runners' JSON outputs, so the page
+  cannot drift from what was measured. The observer reads the server's SQLite store directly;
+  the probe replays the server's real authorization rule out-of-band (shared code, faithful by
+  construction). Effects a channel cannot establish are reported <span class="val">unknown</span>
+  and never counted as evidence. Full methodology, limitations and related-work positioning:
+  <a href="https://github.com/YuCPbit/mcp-proof/blob/main/docs/effect-aware-conformance.md">docs/effect-aware-conformance.md</a>.
+  </p></div>
+  <p class="method" style="margin-top:14px">Reproduce from a clean state:
+  <code class="val">python experiments/run_all.py</code> — regenerates the JSON, the markdown
+  tables and this page. Flagship effect-evidence reports:
+  <code class="val">python experiments/make_report.py</code>.</p>
+</section>
+<footer class="doc">
+Generated by <code>experiments/run_all.py</code> from the runners' own JSON outputs ·
+deterministic testbed · no LLM judging · values shown exactly as measured (3-decimal rounding
+performed by the runners).
+</footer>
+</main>
+</div>
+<script>
+(function(){
+  // scroll-spy: mark the section currently in view in the rail
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a[href^="#"]'));
+  var map = {};
+  links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  var current = null;
+  function setCurrent(id){
+    if (current === id || !map[id]) return;
+    links.forEach(function(a){ a.removeAttribute('aria-current'); });
+    map[id].setAttribute('aria-current','true');
+    current = id;
+  }
+  setCurrent('overview');
+  if ('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if (e.isIntersecting) setCurrent(e.target.id); });
+    }, {rootMargin:'0px 0px -78% 0px'});
+    document.querySelectorAll('[data-spy]').forEach(function(s){ obs.observe(s); });
+  }
+  // click-to-copy for object identifiers
+  document.querySelectorAll('.id[data-copy]').forEach(function(el){
+    el.title = 'click to copy';
+    el.addEventListener('click', function(){
+      var t = el.getAttribute('data-copy');
+      if (navigator.clipboard) navigator.clipboard.writeText(t);
+      el.classList.add('copied');
+      setTimeout(function(){ el.classList.remove('copied'); }, 900);
+    });
+  });
+})();
+</script>
+</body>
+</html>
